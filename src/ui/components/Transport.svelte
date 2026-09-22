@@ -1,13 +1,18 @@
 <script lang="ts">
-  import { BPM_MAX, BPM_MIN, type Command, type TransportState } from '@engine';
+  import { BPM_MAX, BPM_MIN, type Command, type MixParams, type TransportState } from '@engine';
+  import Knob from './Knob.svelte';
 
   interface Props {
     transport: TransportState;
+    mix: MixParams;
     dispatch: (command: Command) => void;
   }
 
-  const { transport, dispatch }: Props = $props();
+  const { transport, mix, dispatch }: Props = $props();
   const playing = $derived(transport.status === 'playing');
+
+  const bpmToNormalized = (bpm: number) => (bpm - BPM_MIN) / (BPM_MAX - BPM_MIN);
+  const normalizedToBpm = (value: number) => Math.round(BPM_MIN + value * (BPM_MAX - BPM_MIN));
 
   function toggle() {
     dispatch({ type: playing ? 'transport/stop' : 'transport/play' });
@@ -26,41 +31,33 @@
     {playing ? '■' : '▶'}
   </button>
 
-  <!-- Curseurs provisoires : remplacés par des knobs au lot 2. -->
-  <label class="field">
-    <span class="name">Tempo</span>
-    <input
-      type="range"
-      min={BPM_MIN}
-      max={BPM_MAX}
-      step="1"
-      value={transport.bpm}
-      oninput={(event) =>
-        dispatch({ type: 'transport/setBpm', bpm: Number(event.currentTarget.value) })}
-    />
-    <output class="value">{transport.bpm} BPM</output>
-  </label>
+  <Knob
+    label="Tempo"
+    value={bpmToNormalized(transport.bpm)}
+    defaultValue={bpmToNormalized(125)}
+    format={(value) => `${normalizedToBpm(value)} BPM`}
+    onchange={(value) => dispatch({ type: 'transport/setBpm', bpm: normalizedToBpm(value) })}
+  />
 
-  <label class="field">
-    <span class="name">Shuffle</span>
-    <input
-      type="range"
-      min="0"
-      max="1"
-      step="0.01"
-      value={transport.shuffle}
-      oninput={(event) =>
-        dispatch({ type: 'transport/setShuffle', value: Number(event.currentTarget.value) })}
-    />
-    <output class="value">{Math.round(transport.shuffle * 100)} %</output>
-  </label>
+  <Knob
+    label="Shuffle"
+    value={transport.shuffle}
+    onchange={(value) => dispatch({ type: 'transport/setShuffle', value })}
+  />
+
+  <Knob
+    label="Master"
+    value={mix.masterLevel}
+    defaultValue={0.8}
+    onchange={(value) => dispatch({ type: 'mix/set', patch: { masterLevel: value } })}
+  />
 </div>
 
 <style>
   .transport {
     display: flex;
     align-items: center;
-    gap: var(--space-5);
+    gap: var(--space-6);
     flex-wrap: wrap;
   }
 
@@ -81,31 +78,5 @@
     background: var(--color-accent);
     color: var(--color-accent-contrast);
     border-color: var(--color-accent);
-  }
-
-  .field {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .name {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .value {
-    min-width: 5em;
-    font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
-    text-align: right;
-  }
-
-  input[type='range'] {
-    width: 160px;
-    accent-color: var(--color-accent);
   }
 </style>

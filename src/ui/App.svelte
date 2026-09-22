@@ -45,7 +45,11 @@
     </header>
 
     <section class="panel">
-      <Transport transport={engine.state.transport} dispatch={engine.dispatch} />
+      <Transport
+        transport={engine.state.transport}
+        mix={engine.state.mix}
+        dispatch={engine.dispatch}
+      />
     </section>
 
     <section class="panel">

@@ -29,6 +29,12 @@ describe('reduce', () => {
     );
   });
 
+  it('mix/set fusionne et borne les niveaux', () => {
+    const next = reduce(initial, { type: 'mix/set', patch: { masterLevel: 1.5, bassLevel: -1 } });
+    expect(next.mix).toEqual({ ...initial.mix, masterLevel: 1, bassLevel: 0 });
+    expect(initial.mix.masterLevel).not.toBe(1);
+  });
+
   it('ne touche pas au reste de l’état', () => {
     const next = reduce(initial, { type: 'transport/setBpm', bpm: 100 });
     expect(next.pattern).toBe(initial.pattern);

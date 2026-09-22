@@ -27,6 +27,7 @@ import {
 import { createInitialState } from './model/defaults';
 import type { EngineState, StepIndex } from './model/types';
 import { reduce } from './state';
+import { createAudioGraph, type AudioGraph } from './synth/graph';
 import { createMetronome, type Metronome } from './synth/metronome';
 
 export type { AudioAvailability, AudioInfo } from './audio/context';
@@ -60,6 +61,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
   const listeners = new Set<(state: EngineState) => void>();
 
   let state: EngineState = createInitialState(audio.info);
+  let graph: AudioGraph | null = null;
   let scheduler: Scheduler | null = null;
   let metronome: Metronome | null = null;
 
@@ -70,8 +72,13 @@ export function createEngine(options: EngineOptions = {}): Engine {
 
   const stopAudioUpdates = audio.onChange((info) => setState({ ...state, audio: info }));
 
+  const ensureGraph = (ctx: AudioContextLike): AudioGraph => {
+    graph ??= createAudioGraph(ctx, state.mix);
+    return graph;
+  };
+
   const ensureScheduler = (ctx: AudioContextLike): Scheduler => {
-    metronome ??= createMetronome(ctx);
+    metronome ??= createMetronome(ctx, ensureGraph(ctx).master);
     scheduler ??= createScheduler({
       clock: { now: () => ctx.currentTime },
       timer,
@@ -111,6 +118,10 @@ export function createEngine(options: EngineOptions = {}): Engine {
         case 'transport/stop':
           stop();
           return;
+        case 'mix/set':
+          setState(reduce(state, command));
+          graph?.applyMix(state.mix);
+          return;
         default:
           setState(reduce(state, command));
       }
@@ -130,6 +141,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const ctx = audio.context;
       if (ctx === null || ctx.state !== 'running') return;
 
+      const { master } = ensureGraph(ctx);
       const now = ctx.currentTime;
       const stopAt = now + TEST_TONE_ATTACK_S + TEST_TONE_DECAY_S;
 
@@ -143,7 +155,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
       vca.gain.exponentialRampToValueAtTime(MIN_GAIN, stopAt);
 
       oscillator.connect(vca);
-      vca.connect(ctx.destination);
+      vca.connect(master);
       oscillator.addEventListener('ended', () => {
         oscillator.disconnect();
         vca.disconnect();
@@ -154,6 +166,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
     dispose() {
       scheduler?.stop();
       timer.dispose();
+      graph?.dispose();
       stopAudioUpdates();
       listeners.clear();
       audio.dispose();

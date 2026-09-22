@@ -29,7 +29,10 @@ export const SCHEDULE_EPSILON_S = 0.001;
  */
 export const MAX_LATE_S = 0.25;
 
-/* ---------- Gains ---------- */
+/* ---------- Gains et lissage ---------- */
+/** Constante de temps du lissage des knobs (`setTargetAtTime`), anti-zipper. */
+export const KNOB_SMOOTHING_S = 0.01;
+
 /**
  * Plancher des gains rampés exponentiellement : `exponentialRampToValueAtTime`
  * refuse la valeur 0 et ne rampe pas depuis 0. Environ −80 dB, inaudible.

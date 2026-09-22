@@ -52,4 +52,12 @@
   /* Composants */
   --control-size: 44px; /* cible tactile minimale */
   --focus-ring: 0 0 0 2px var(--color-focus);
+
+  /* Knob (dimensions internes de l'arc en unités du viewBox 100 × 100) */
+  --knob-size: 64px;
+  --knob-stroke: 8;
+  --knob-indicator-stroke: 6;
+  --knob-track: var(--color-surface-raised);
+  --knob-arc: var(--color-accent);
+  --knob-indicator: var(--color-text);
 }

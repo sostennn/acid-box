@@ -6,7 +6,7 @@ import { createMetronome } from './metronome';
 describe('createMetronome', () => {
   it('crée une source par frappe, démarrée et arrêtée au temps demandé', () => {
     const ctx = new FakeAudioContext();
-    const metronome = createMetronome(ctx.asContext());
+    const metronome = createMetronome(ctx.asContext(), ctx.destination as unknown as AudioNode);
     metronome.trigger(0, 5);
     metronome.trigger(1, 5.125);
 
@@ -18,7 +18,7 @@ describe('createMetronome', () => {
 
   it('accentue le premier pas par une fréquence plus haute', () => {
     const ctx = new FakeAudioContext();
-    const metronome = createMetronome(ctx.asContext());
+    const metronome = createMetronome(ctx.asContext(), ctx.destination as unknown as AudioNode);
     metronome.trigger(0, 1);
     metronome.trigger(4, 2);
     const downbeat = ctx.oscillators[0]?.frequency.calls[0]?.value ?? 0;
@@ -29,7 +29,7 @@ describe('createMetronome', () => {
   it('ne programme jamais dans le passé ni de rampe vers zéro', () => {
     const ctx = new FakeAudioContext();
     ctx.currentTime = 10;
-    const metronome = createMetronome(ctx.asContext());
+    const metronome = createMetronome(ctx.asContext(), ctx.destination as unknown as AudioNode);
     metronome.trigger(2, 9.9);
 
     expect(ctx.oscillators[0]?.startedAt).toBeCloseTo(10 + SCHEDULE_EPSILON_S, 10);
@@ -39,7 +39,7 @@ describe('createMetronome', () => {
 
   it('libère les nœuds en fin de frappe', () => {
     const ctx = new FakeAudioContext();
-    createMetronome(ctx.asContext()).trigger(0, 1);
+    createMetronome(ctx.asContext(), ctx.destination as unknown as AudioNode).trigger(0, 1);
     ctx.oscillators[0]?.emit('ended');
     expect(ctx.oscillators[0]?.connections).toHaveLength(0);
     expect(ctx.gains[0]?.connections).toHaveLength(0);

@@ -18,7 +18,7 @@ export interface Metronome {
   trigger(step: StepIndex, time: number): void;
 }
 
-export function createMetronome(ctx: AudioContextLike): Metronome {
+export function createMetronome(ctx: AudioContextLike, output: AudioNode): Metronome {
   return {
     trigger(step, time) {
       const start = safeTime(ctx, time);
@@ -40,7 +40,7 @@ export function createMetronome(ctx: AudioContextLike): Metronome {
       vca.gain.exponentialRampToValueAtTime(MIN_GAIN, stop);
 
       oscillator.connect(vca);
-      vca.connect(ctx.destination);
+      vca.connect(output);
       oscillator.addEventListener('ended', () => {
         oscillator.disconnect();
         vca.disconnect();

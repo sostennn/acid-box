@@ -4,7 +4,7 @@
  */
 import type { Command } from './commands';
 import { BPM_MAX, BPM_MIN } from './model/constants';
-import type { EngineState } from './model/types';
+import type { EngineState, MixParams } from './model/types';
 
 export function reduce(state: EngineState, command: Command): EngineState {
   switch (command.type) {
@@ -16,11 +16,21 @@ export function reduce(state: EngineState, command: Command): EngineState {
       return withTransport(state, { bpm: clamp(command.bpm, BPM_MIN, BPM_MAX) });
     case 'transport/setShuffle':
       return withTransport(state, { shuffle: clamp(command.value, 0, 1) });
+    case 'mix/set':
+      return { ...state, mix: { ...state.mix, ...clampPatch(command.patch) } };
   }
 }
 
 function withTransport(state: EngineState, patch: Partial<EngineState['transport']>): EngineState {
   return { ...state, transport: { ...state.transport, ...patch } };
+}
+
+function clampPatch(patch: Partial<MixParams>): Partial<MixParams> {
+  const result: Record<string, number> = {};
+  for (const [key, value] of Object.entries(patch)) {
+    if (typeof value === 'number') result[key] = clamp(value, 0, 1);
+  }
+  return result as Partial<MixParams>;
 }
 
 export function clamp(value: number, min: number, max: number): number {

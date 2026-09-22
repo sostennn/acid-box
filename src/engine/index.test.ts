@@ -108,15 +108,31 @@ describe('createEngine', () => {
     engine.playTestTone();
 
     const [oscillator] = ctx.oscillators;
-    const [vca] = ctx.gains;
+    const [master, vca] = ctx.gains;
     expect(oscillator?.startedAt).toBe(2);
     expect(oscillator?.stoppedAt).toBeGreaterThan(2);
     expect(oscillator?.connections).toContain(vca);
-    expect(vca?.connections).toContain(ctx.destination);
+    expect(vca?.connections).toContain(master);
+    expect(master?.connections).toContain(ctx.destination);
 
     const rampValues = vca?.gain.calls.map((call) => call.value) ?? [];
     expect(rampValues.length).toBeGreaterThan(0);
     expect(rampValues.every((value) => value >= MIN_GAIN)).toBe(true);
+  });
+
+  it('route le son par un bus master dont le niveau est lissé, jamais écrit en direct', async () => {
+    const { engine, ctx } = setup();
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+    const master = ctx.gains[0];
+    expect(master?.connections).toContain(ctx.destination);
+    expect(ctx.oscillators[0]?.connections[0]).not.toBe(ctx.destination);
+
+    engine.dispatch({ type: 'mix/set', patch: { masterLevel: 0.5 } });
+    expect(engine.getState().mix.masterLevel).toBe(0.5);
+    const last = master?.gain.calls.at(-1);
+    expect(last?.method).toBe('setTargetAtTime');
+    expect(last?.value).toBeCloseTo(0.25, 10);
   });
 
   it('dispose libère le timer', () => {

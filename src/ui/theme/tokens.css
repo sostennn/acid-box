@@ -1,0 +1,55 @@
+/*
+ * Tokens visuels : le SEUL fichier autorisé à contenir des couleurs, rayons,
+ * espacements et typographies en clair (Stylelint refuse les littéraux ailleurs).
+ * Réhabiller l'application = modifier ce fichier, sans toucher aux composants.
+ *
+ * Palette neutre provisoire, en attendant la direction artistique.
+ */
+:root {
+  /* Couleurs */
+  --color-bg: #141417;
+  --color-surface: #1e1e23;
+  --color-surface-raised: #27272e;
+  --color-border: #3a3a44;
+  --color-text: #ececf1;
+  --color-text-muted: #9a9aa6;
+  --color-accent: #c8ff3a;
+  --color-accent-contrast: #141417;
+  --color-danger: #ff5a5a;
+  --color-focus: #7ab8ff;
+
+  /* Rayons */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-round: 999px;
+
+  /* Espacements (échelle 4 px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Typographie */
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-size-sm: 0.75rem;
+  --font-size-md: 0.9375rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 2rem;
+  --font-weight-regular: 400;
+  --font-weight-bold: 600;
+  --line-height: 1.4;
+
+  /* Ombres et mouvement */
+  --shadow-raised: 0 2px 8px rgb(0 0 0 / 40%);
+  --duration-fast: 120ms;
+  --easing: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Composants */
+  --control-size: 44px; /* cible tactile minimale */
+  --focus-ring: 0 0 0 2px var(--color-focus);
+}

@@ -1,0 +1,26 @@
+{
+  "overrides": [
+    { "files": ["**/*.svelte"], "customSyntax": "postcss-html" },
+    {
+      "files": ["src/ui/theme/tokens.css"],
+      "rules": {
+        "color-no-hex": null,
+        "color-named": null,
+        "function-disallowed-list": null,
+        "declaration-property-value-disallowed-list": null
+      }
+    }
+  ],
+  "rules": {
+    "color-no-hex": true,
+    "color-named": "never",
+    "function-disallowed-list": ["rgb", "rgba", "hsl", "hsla", "oklch", "oklab", "color-mix"],
+    "declaration-property-value-disallowed-list": {
+      "/^border(-.*)?-radius$/": ["/^\\d/"],
+      "font-size": ["/^\\d/"],
+      "font-family": ["/^(?!var\\().+/"],
+      "/^(padding|margin|gap|row-gap|column-gap)(-.*)?$/": ["/\\d(px|rem|em)/"],
+      "box-shadow": ["/\\d(px|rem|em)/"]
+    }
+  }
+}

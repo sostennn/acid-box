@@ -14,26 +14,23 @@ import {
 import type { TimerSource } from './clock/clock';
 import { createPlayheadQueue } from './clock/playhead-queue';
 import { createScheduler, type Scheduler } from './clock/scheduler';
+import { stepDurationSeconds } from './clock/timing';
 import { createWorkerTimer } from './clock/worker-timer';
 import type { Command } from './commands';
-import {
-  MIN_GAIN,
-  START_DELAY_S,
-  TEST_TONE_ATTACK_S,
-  TEST_TONE_DECAY_S,
-  TEST_TONE_FREQUENCY_HZ,
-  TEST_TONE_PEAK_GAIN,
-} from './model/constants';
+import { START_DELAY_S } from './model/constants';
 import { createInitialState } from './model/defaults';
 import type { EngineState, StepIndex } from './model/types';
 import { reduce } from './state';
+import { createBassVoice, type BassVoice } from './synth/bass/bass-voice';
+import { createBiquadFilterStage } from './synth/filter-stage';
 import { createAudioGraph, type AudioGraph } from './synth/graph';
-import { createMetronome, type Metronome } from './synth/metronome';
 
 export type { AudioAvailability, AudioInfo } from './audio/context';
-export type { Command } from './commands';
+export type { Command, StepFlag } from './commands';
 export type * from './model/types';
-export { BPM_MAX, BPM_MIN, STEP_COUNT } from './model/constants';
+export { BPM_MAX, BPM_MIN, STEP_COUNT, TUNING_RANGE_SEMITONES } from './model/constants';
+export { cutoffToHz, decayToSeconds, resonanceToQ, tuningToCents } from './model/mapping';
+export { PITCH_RANGE_SEMITONES, indexToPitch, pitchLabel, pitchToIndex } from './model/pitch';
 
 export interface EngineOptions {
   readonly createContext?: AudioContextFactory;
@@ -49,8 +46,6 @@ export interface Engine {
   subscribe(listener: (state: EngineState) => void): () => void;
   /** Pour la boucle d'affichage : pas audible à l'instant présent, null à l'arrêt. */
   audibleStep(): StepIndex | null;
-  /** Son bref pour valider la chaîne audio. Provisoire : remplacé par la voix basse au lot 3. */
-  playTestTone(): void;
   dispose(): void;
 }
 
@@ -62,8 +57,8 @@ export function createEngine(options: EngineOptions = {}): Engine {
 
   let state: EngineState = createInitialState(audio.info);
   let graph: AudioGraph | null = null;
+  let voice: BassVoice | null = null;
   let scheduler: Scheduler | null = null;
-  let metronome: Metronome | null = null;
 
   const setState = (next: EngineState) => {
     state = next;
@@ -77,15 +72,27 @@ export function createEngine(options: EngineOptions = {}): Engine {
     return graph;
   };
 
+  const ensureVoice = (ctx: AudioContextLike): BassVoice => {
+    voice ??= createBassVoice(ctx, createBiquadFilterStage(ctx), ensureGraph(ctx).bass, state.bass);
+    return voice;
+  };
+
   const ensureScheduler = (ctx: AudioContextLike): Scheduler => {
-    metronome ??= createMetronome(ctx, ensureGraph(ctx).master);
+    const bass = ensureVoice(ctx);
     scheduler ??= createScheduler({
       clock: { now: () => ctx.currentTime },
       timer,
       getTransport: () => state.transport,
-      onStep: (step, time) => {
-        metronome?.trigger(step, time);
-        playhead.push({ step, time });
+      onStep: (index, time) => {
+        // Le pattern et les knobs sont lus au moment de programmer : une
+        // édition prend effet au plus tard une fenêtre de lookahead plus tard.
+        bass.trigger(
+          state.pattern.bass[index],
+          time,
+          stepDurationSeconds(state.transport.bpm),
+          state.bass,
+        );
+        playhead.push({ step: index, time });
       },
     });
     return scheduler;
@@ -104,6 +111,8 @@ export function createEngine(options: EngineOptions = {}): Engine {
 
   const stop = () => {
     scheduler?.stop();
+    const ctx = audio.context;
+    if (ctx !== null) voice?.release(ctx.currentTime);
     playhead.clear();
     setState(reduce(state, { type: 'transport/stop' }));
   };
@@ -122,6 +131,11 @@ export function createEngine(options: EngineOptions = {}): Engine {
           setState(reduce(state, command));
           graph?.applyMix(state.mix);
           return;
+        case 'bass/setKnob':
+        case 'bass/setWaveform':
+          setState(reduce(state, command));
+          voice?.applyParams(state.bass);
+          return;
         default:
           setState(reduce(state, command));
       }
@@ -137,35 +151,10 @@ export function createEngine(options: EngineOptions = {}): Engine {
       // Un événement programmé à t s'entend à t + latence de sortie.
       return playhead.audibleStep(ctx.currentTime - state.audio.outputLatency);
     },
-    playTestTone() {
-      const ctx = audio.context;
-      if (ctx === null || ctx.state !== 'running') return;
-
-      const { master } = ensureGraph(ctx);
-      const now = ctx.currentTime;
-      const stopAt = now + TEST_TONE_ATTACK_S + TEST_TONE_DECAY_S;
-
-      const oscillator = ctx.createOscillator();
-      oscillator.type = 'sawtooth';
-      oscillator.frequency.setValueAtTime(TEST_TONE_FREQUENCY_HZ, now);
-
-      const vca = ctx.createGain();
-      vca.gain.setValueAtTime(MIN_GAIN, now);
-      vca.gain.exponentialRampToValueAtTime(TEST_TONE_PEAK_GAIN, now + TEST_TONE_ATTACK_S);
-      vca.gain.exponentialRampToValueAtTime(MIN_GAIN, stopAt);
-
-      oscillator.connect(vca);
-      vca.connect(master);
-      oscillator.addEventListener('ended', () => {
-        oscillator.disconnect();
-        vca.disconnect();
-      });
-      oscillator.start(now);
-      oscillator.stop(stopAt);
-    },
     dispose() {
       scheduler?.stop();
       timer.dispose();
+      voice?.dispose();
       graph?.dispose();
       stopAudioUpdates();
       listeners.clear();

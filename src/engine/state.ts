@@ -4,7 +4,7 @@
  */
 import type { Command } from './commands';
 import { BPM_MAX, BPM_MIN } from './model/constants';
-import type { EngineState, MixParams } from './model/types';
+import type { BassPattern, EngineState, MixParams, Step, StepIndex } from './model/types';
 
 export function reduce(state: EngineState, command: Command): EngineState {
   switch (command.type) {
@@ -16,6 +16,17 @@ export function reduce(state: EngineState, command: Command): EngineState {
       return withTransport(state, { bpm: clamp(command.bpm, BPM_MIN, BPM_MAX) });
     case 'transport/setShuffle':
       return withTransport(state, { shuffle: clamp(command.value, 0, 1) });
+    case 'pattern/setStep':
+      return withBassStep(state, command.index, (step) => ({ ...step, ...command.patch }));
+    case 'pattern/toggleStepFlag':
+      return withBassStep(state, command.index, (step) => ({
+        ...step,
+        [command.flag]: !step[command.flag],
+      }));
+    case 'bass/setWaveform':
+      return { ...state, bass: { ...state.bass, waveform: command.waveform } };
+    case 'bass/setKnob':
+      return { ...state, bass: { ...state.bass, [command.knob]: clamp(command.value, 0, 1) } };
     case 'mix/set':
       return { ...state, mix: { ...state.mix, ...clampPatch(command.patch) } };
   }
@@ -23,6 +34,16 @@ export function reduce(state: EngineState, command: Command): EngineState {
 
 function withTransport(state: EngineState, patch: Partial<EngineState['transport']>): EngineState {
   return { ...state, transport: { ...state.transport, ...patch } };
+}
+
+function withBassStep(
+  state: EngineState,
+  index: StepIndex,
+  update: (step: Step) => Step,
+): EngineState {
+  const current = state.pattern.bass[index];
+  const bass = state.pattern.bass.map((step, i) => (i === index ? update(current) : step));
+  return { ...state, pattern: { ...state.pattern, bass: bass as unknown as BassPattern } };
 }
 
 function clampPatch(patch: Partial<MixParams>): Partial<MixParams> {

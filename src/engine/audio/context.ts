@@ -36,6 +36,8 @@ export type AudioContextLike = Pick<
   | 'createBufferSource'
   | 'createOscillator'
   | 'createGain'
+  | 'createBiquadFilter'
+  | 'createWaveShaper'
   | 'addEventListener'
   | 'removeEventListener'
 > & {

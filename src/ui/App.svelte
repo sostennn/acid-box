@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import AudioGate from './components/AudioGate.svelte';
-  import PlayheadStrip from './components/PlayheadStrip.svelte';
+  import BassPanel from './components/BassPanel.svelte';
+  import BassSequencer from './components/BassSequencer.svelte';
   import Transport from './components/Transport.svelte';
   import { createPlayhead } from './playhead/playhead.svelte';
   import { createEngineStore } from './state/engine.svelte';
@@ -10,16 +11,11 @@
   const playhead = createPlayhead(engine);
   onDestroy(() => engine.dispose());
 
-  async function unlock() {
-    await engine.unlock();
-    engine.playTestTone();
-  }
-
   function onKeydown(event: KeyboardEvent) {
     if (event.code !== 'Space' || event.repeat) return;
     if (
       event.target instanceof HTMLElement &&
-      event.target.closest('button, input, select, textarea')
+      event.target.closest('button, input, select, textarea, [role="slider"]')
     ) {
       return;
     }
@@ -33,7 +29,7 @@
 <svelte:window onkeydown={onKeydown} />
 
 {#if engine.state.audio.availability !== 'running'}
-  <AudioGate availability={engine.state.audio.availability} onunlock={unlock} />
+  <AudioGate availability={engine.state.audio.availability} onunlock={() => engine.unlock()} />
 {:else}
   <main class="app">
     <header class="header">
@@ -53,7 +49,15 @@
     </section>
 
     <section class="panel">
-      <PlayheadStrip step={playhead.step} />
+      <BassPanel bass={engine.state.bass} dispatch={engine.dispatch} />
+    </section>
+
+    <section class="panel">
+      <BassSequencer
+        pattern={engine.state.pattern.bass}
+        activeStep={playhead.step}
+        dispatch={engine.dispatch}
+      />
     </section>
   </main>
 {/if}

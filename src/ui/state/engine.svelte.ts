@@ -10,7 +10,6 @@ export interface EngineStore {
   dispatch(command: Command): void;
   unlock(): Promise<void>;
   audibleStep(): StepIndex | null;
-  playTestTone(): void;
   dispose(): void;
 }
 
@@ -27,7 +26,6 @@ export function createEngineStore(engine: Engine = createEngine()): EngineStore 
     dispatch: (command) => engine.dispatch(command),
     unlock: () => engine.unlock(),
     audibleStep: () => engine.audibleStep(),
-    playTestTone: () => engine.playTestTone(),
     dispose() {
       unsubscribe();
       engine.dispose();

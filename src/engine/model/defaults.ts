@@ -7,7 +7,9 @@ import type {
   EngineState,
   GeneratorParams,
   MixParams,
+  OctaveOffset,
   Pattern,
+  PitchClass,
   Step,
   TransportState,
   Tuple16,
@@ -26,8 +28,32 @@ export const DEFAULT_DRUM_PATTERN: DrumPattern = {
   openHat: tuple16(() => 0),
 };
 
+/** Une ligne en Do mineur pour que le premier play sonne déjà acid. */
+const DEFAULT_BASS_LINE: readonly (readonly [PitchClass, OctaveOffset] | null)[] = [
+  [0, 0],
+  null,
+  [0, 0],
+  [3, 0],
+  [0, 0],
+  null,
+  [7, -1],
+  [0, 0],
+  null,
+  [0, 0],
+  [10, -1],
+  [0, 0],
+  [3, 0],
+  null,
+  [0, 1],
+  [7, 0],
+];
+
 export const DEFAULT_PATTERN: Pattern = {
-  bass: tuple16(() => DEFAULT_STEP),
+  bass: tuple16((index) => {
+    const entry = DEFAULT_BASS_LINE[index];
+    if (entry === null || entry === undefined) return { ...DEFAULT_STEP, rest: true };
+    return { ...DEFAULT_STEP, note: entry[0], octave: entry[1] };
+  }),
   drums: DEFAULT_DRUM_PATTERN,
 };
 

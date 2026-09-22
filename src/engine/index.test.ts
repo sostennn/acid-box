@@ -3,6 +3,7 @@ import { FakeAudioContext, createFakeVisibility } from '../../tests/fakes/fake-a
 import { FakeTimer } from '../../tests/fakes/fake-clock';
 import { createEngine } from './index';
 import { MIN_GAIN, START_DELAY_S } from './model/constants';
+import { midiToFrequency, pitchToMidi } from './model/pitch';
 
 function setup() {
   const ctx = new FakeAudioContext();
@@ -44,7 +45,7 @@ describe('createEngine', () => {
     expect(engine.getState().transport).toMatchObject({ bpm: 140, shuffle: 0.25 });
   });
 
-  it('play débloque l’audio, démarre le scheduler et programme le premier pas', async () => {
+  it('play débloque l’audio, crée la voix et programme le premier pas du pattern', async () => {
     const { engine, ctx, timer } = setup();
     ctx.currentTime = 3;
     engine.dispatch({ type: 'transport/play' });
@@ -53,7 +54,22 @@ describe('createEngine', () => {
     expect(engine.getState().transport.status).toBe('playing');
     expect(ctx.state).toBe('running');
     expect(timer.running).toBe(true);
-    expect(ctx.oscillators[0]?.startedAt).toBeCloseTo(3 + START_DELAY_S, 10);
+    expect(ctx.oscillators).toHaveLength(1);
+
+    const firstStep = engine.getState().pattern.bass[0];
+    const set = ctx.oscillators[0]?.frequency.calls.find((c) => c.method === 'setValueAtTime');
+    expect(set?.time).toBeCloseTo(3 + START_DELAY_S, 10);
+    expect(set?.value).toBeCloseTo(midiToFrequency(pitchToMidi(firstStep)), 6);
+  });
+
+  it('route la voix par le bus basse puis le master', async () => {
+    const { engine, ctx } = setup();
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+    const [master, bass] = ctx.gains;
+    expect(master?.connections).toContain(ctx.destination);
+    expect(bass?.connections).toContain(master);
+    expect(ctx.gains.some((g) => g.connections.includes(bass))).toBe(true);
   });
 
   it('audibleStep suit le temps audio, latence de sortie comprise', async () => {
@@ -65,7 +81,6 @@ describe('createEngine', () => {
     ctx.currentTime = START_DELAY_S;
     expect(engine.audibleStep()).toBe(0);
 
-    // Pas 1 programmé à 0.05 + 0.12 s (125 BPM) : encore inaudible juste avant.
     ctx.currentTime = 0.16;
     timer.tick();
     expect(engine.audibleStep()).toBe(0);
@@ -73,7 +88,7 @@ describe('createEngine', () => {
     expect(engine.audibleStep()).toBe(1);
   });
 
-  it('stop arrête le scheduler et vide la tête de lecture', async () => {
+  it('stop arrête le scheduler, relâche la voix et vide la tête de lecture', async () => {
     const { engine, ctx, timer } = setup();
     engine.dispatch({ type: 'transport/play' });
     await flush();
@@ -83,61 +98,46 @@ describe('createEngine', () => {
     expect(engine.getState().transport.status).toBe('stopped');
     expect(timer.running).toBe(false);
     expect(engine.audibleStep()).toBeNull();
+    const vca = ctx.gains.find((g) => g.gain.calls.some((c) => c.value === 1));
+    expect(vca?.gain.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime', value: MIN_GAIN });
+    expect(ctx.oscillators[0]?.stoppedAt).toBeNull();
+  });
+
+  it('les knobs de la basse atteignent la voix en lecture', async () => {
+    const { engine, ctx } = setup();
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+    engine.dispatch({ type: 'bass/setKnob', knob: 'cutoff', value: 1 });
+    engine.dispatch({ type: 'bass/setWaveform', waveform: 'square' });
+    expect(ctx.filters[0]?.frequency.calls.at(-1)?.method).toBe('setTargetAtTime');
+    expect(ctx.oscillators[0]?.type).toBe('square');
+  });
+
+  it('les niveaux du mix sont lissés, jamais écrits en direct', async () => {
+    const { engine, ctx } = setup();
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+    engine.dispatch({ type: 'mix/set', patch: { masterLevel: 0.5, bassLevel: 1 } });
+    const [master, bass] = ctx.gains;
+    expect(master?.gain.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime', value: 0.25 });
+    expect(bass?.gain.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime', value: 1 });
   });
 
   it('play est idempotent', async () => {
     const { engine, ctx } = setup();
     engine.dispatch({ type: 'transport/play' });
     await flush();
-    const count = ctx.oscillators.length;
     engine.dispatch({ type: 'transport/play' });
     await flush();
-    expect(ctx.oscillators).toHaveLength(count);
+    expect(ctx.oscillators).toHaveLength(1);
   });
 
-  it('ignore le son de test tant que l’audio est verrouillé', () => {
-    const { engine, ctx } = setup();
-    engine.playTestTone();
-    expect(ctx.oscillators).toHaveLength(0);
-  });
-
-  it('joue un son de test avec une source à usage unique et des rampes jamais nulles', async () => {
-    const { engine, ctx } = setup();
-    await engine.unlock();
-    ctx.currentTime = 2;
-    engine.playTestTone();
-
-    const [oscillator] = ctx.oscillators;
-    const [master, vca] = ctx.gains;
-    expect(oscillator?.startedAt).toBe(2);
-    expect(oscillator?.stoppedAt).toBeGreaterThan(2);
-    expect(oscillator?.connections).toContain(vca);
-    expect(vca?.connections).toContain(master);
-    expect(master?.connections).toContain(ctx.destination);
-
-    const rampValues = vca?.gain.calls.map((call) => call.value) ?? [];
-    expect(rampValues.length).toBeGreaterThan(0);
-    expect(rampValues.every((value) => value >= MIN_GAIN)).toBe(true);
-  });
-
-  it('route le son par un bus master dont le niveau est lissé, jamais écrit en direct', async () => {
-    const { engine, ctx } = setup();
+  it('dispose libère le timer et arrête l’oscillateur', async () => {
+    const { engine, timer, ctx } = setup();
     engine.dispatch({ type: 'transport/play' });
     await flush();
-    const master = ctx.gains[0];
-    expect(master?.connections).toContain(ctx.destination);
-    expect(ctx.oscillators[0]?.connections[0]).not.toBe(ctx.destination);
-
-    engine.dispatch({ type: 'mix/set', patch: { masterLevel: 0.5 } });
-    expect(engine.getState().mix.masterLevel).toBe(0.5);
-    const last = master?.gain.calls.at(-1);
-    expect(last?.method).toBe('setTargetAtTime');
-    expect(last?.value).toBeCloseTo(0.25, 10);
-  });
-
-  it('dispose libère le timer', () => {
-    const { engine, timer } = setup();
     engine.dispose();
     expect(timer.disposed).toBe(true);
+    expect(ctx.oscillators[0]?.stoppedAt).not.toBeNull();
   });
 });

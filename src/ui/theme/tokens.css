@@ -60,4 +60,13 @@
   --knob-track: var(--color-surface-raised);
   --knob-arc: var(--color-accent);
   --knob-indicator: var(--color-text);
+
+  /* Séquenceur */
+  --step-gap: var(--space-1);
+  --step-cell-bg: var(--color-surface-raised);
+  --step-cell-bg-rest: var(--color-surface);
+  --step-cell-active: var(--color-accent);
+  --step-active-ring: inset 0 0 0 2px var(--step-cell-active);
+  --step-flag-on: var(--color-accent);
+  --step-flag-off: var(--color-border);
 }

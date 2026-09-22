@@ -29,6 +29,35 @@ describe('reduce', () => {
     );
   });
 
+  it('pattern/setStep remplace un pas sans muter le tuple précédent', () => {
+    const next = reduce(initial, {
+      type: 'pattern/setStep',
+      index: 3,
+      patch: { note: 5, octave: 1 },
+    });
+    expect(next.pattern.bass[3]).toMatchObject({ note: 5, octave: 1 });
+    expect(next.pattern.bass).toHaveLength(16);
+    expect(next.pattern.bass[2]).toBe(initial.pattern.bass[2]);
+    expect(initial.pattern.bass[3]).not.toMatchObject({ note: 5, octave: 1 });
+  });
+
+  it('pattern/toggleStepFlag inverse un drapeau', () => {
+    const once = reduce(initial, { type: 'pattern/toggleStepFlag', index: 0, flag: 'rest' });
+    expect(once.pattern.bass[0]?.rest).toBe(!initial.pattern.bass[0]?.rest);
+    const twice = reduce(once, { type: 'pattern/toggleStepFlag', index: 0, flag: 'rest' });
+    expect(twice.pattern.bass[0]?.rest).toBe(initial.pattern.bass[0]?.rest);
+  });
+
+  it('bass/setKnob borne et bass/setWaveform commute', () => {
+    expect(reduce(initial, { type: 'bass/setKnob', knob: 'cutoff', value: 2 }).bass.cutoff).toBe(1);
+    expect(reduce(initial, { type: 'bass/setKnob', knob: 'drive', value: 0.3 }).bass.drive).toBe(
+      0.3,
+    );
+    expect(reduce(initial, { type: 'bass/setWaveform', waveform: 'square' }).bass.waveform).toBe(
+      'square',
+    );
+  });
+
   it('mix/set fusionne et borne les niveaux', () => {
     const next = reduce(initial, { type: 'mix/set', patch: { masterLevel: 1.5, bassLevel: -1 } });
     expect(next.mix).toEqual({ ...initial.mix, masterLevel: 1, bassLevel: 0 });

@@ -34,6 +34,11 @@ export class FakeAudioParam {
     this.calls.push({ method: 'setTargetAtTime', value, time });
     return this;
   }
+
+  cancelScheduledValues(time: number) {
+    this.calls.push({ method: 'cancelScheduledValues', value: NaN, time });
+    return this;
+  }
 }
 
 class FakeNode {
@@ -91,6 +96,18 @@ export class FakeGainNode extends FakeNode {
   readonly gain = new FakeAudioParam();
 }
 
+export class FakeBiquadFilterNode extends FakeNode {
+  type = 'lowpass';
+  readonly frequency = new FakeAudioParam();
+  readonly detune = new FakeAudioParam();
+  readonly Q = new FakeAudioParam();
+}
+
+export class FakeWaveShaperNode extends FakeNode {
+  curve: Float32Array | null = null;
+  oversample = 'none';
+}
+
 export class FakeAudioContext extends FakeNode {
   state: AudioContextState = 'suspended';
   currentTime = 0;
@@ -99,6 +116,8 @@ export class FakeAudioContext extends FakeNode {
   readonly oscillators: FakeOscillatorNode[] = [];
   readonly bufferSources: FakeBufferSourceNode[] = [];
   readonly gains: FakeGainNode[] = [];
+  readonly filters: FakeBiquadFilterNode[] = [];
+  readonly shapers: FakeWaveShaperNode[] = [];
   resumeCount = 0;
   closed = false;
 
@@ -136,6 +155,18 @@ export class FakeAudioContext extends FakeNode {
   createGain() {
     const node = new FakeGainNode();
     this.gains.push(node);
+    return node;
+  }
+
+  createBiquadFilter() {
+    const node = new FakeBiquadFilterNode();
+    this.filters.push(node);
+    return node;
+  }
+
+  createWaveShaper() {
+    const node = new FakeWaveShaperNode();
+    this.shapers.push(node);
     return node;
   }
 

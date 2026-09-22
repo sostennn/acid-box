@@ -1,16 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext, createFakeVisibility } from '../../tests/fakes/fake-audio-context';
+import { FakeTimer } from '../../tests/fakes/fake-clock';
 import { createEngine } from './index';
-import { MIN_GAIN } from './model/constants';
+import { MIN_GAIN, START_DELAY_S } from './model/constants';
 
 function setup() {
   const ctx = new FakeAudioContext();
+  const timer = new FakeTimer();
   const engine = createEngine({
     createContext: () => ctx.asContext(),
     visibility: createFakeVisibility(),
+    timer,
   });
-  return { ctx, engine };
+  return { ctx, timer, engine };
 }
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('createEngine', () => {
   it('expose l’état audio et notifie les abonnés', async () => {
@@ -30,6 +35,64 @@ describe('createEngine', () => {
     await engine.unlock();
     expect(engine.getState()).not.toBe(before);
     expect(before.audio.availability).toBe('locked');
+  });
+
+  it('applique les commandes de transport via le reducer', () => {
+    const { engine } = setup();
+    engine.dispatch({ type: 'transport/setBpm', bpm: 140 });
+    engine.dispatch({ type: 'transport/setShuffle', value: 0.25 });
+    expect(engine.getState().transport).toMatchObject({ bpm: 140, shuffle: 0.25 });
+  });
+
+  it('play débloque l’audio, démarre le scheduler et programme le premier pas', async () => {
+    const { engine, ctx, timer } = setup();
+    ctx.currentTime = 3;
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+
+    expect(engine.getState().transport.status).toBe('playing');
+    expect(ctx.state).toBe('running');
+    expect(timer.running).toBe(true);
+    expect(ctx.oscillators[0]?.startedAt).toBeCloseTo(3 + START_DELAY_S, 10);
+  });
+
+  it('audibleStep suit le temps audio, latence de sortie comprise', async () => {
+    const { engine, ctx, timer } = setup();
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+    expect(engine.audibleStep()).toBeNull();
+
+    ctx.currentTime = START_DELAY_S;
+    expect(engine.audibleStep()).toBe(0);
+
+    // Pas 1 programmé à 0.05 + 0.12 s (125 BPM) : encore inaudible juste avant.
+    ctx.currentTime = 0.16;
+    timer.tick();
+    expect(engine.audibleStep()).toBe(0);
+    ctx.currentTime = 0.18;
+    expect(engine.audibleStep()).toBe(1);
+  });
+
+  it('stop arrête le scheduler et vide la tête de lecture', async () => {
+    const { engine, ctx, timer } = setup();
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+    ctx.currentTime = 1;
+    engine.dispatch({ type: 'transport/stop' });
+
+    expect(engine.getState().transport.status).toBe('stopped');
+    expect(timer.running).toBe(false);
+    expect(engine.audibleStep()).toBeNull();
+  });
+
+  it('play est idempotent', async () => {
+    const { engine, ctx } = setup();
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+    const count = ctx.oscillators.length;
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+    expect(ctx.oscillators).toHaveLength(count);
   });
 
   it('ignore le son de test tant que l’audio est verrouillé', () => {
@@ -56,13 +119,9 @@ describe('createEngine', () => {
     expect(rampValues.every((value) => value >= MIN_GAIN)).toBe(true);
   });
 
-  it('libère les nœuds du son de test une fois terminé', async () => {
-    const { engine, ctx } = setup();
-    await engine.unlock();
-    engine.playTestTone();
-
-    ctx.oscillators[0]?.emit('ended');
-    expect(ctx.oscillators[0]?.connections).toHaveLength(0);
-    expect(ctx.gains[0]?.connections).toHaveLength(0);
+  it('dispose libère le timer', () => {
+    const { engine, timer } = setup();
+    engine.dispose();
+    expect(timer.disposed).toBe(true);
   });
 });

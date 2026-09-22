@@ -8,33 +8,46 @@
 import {
   createAudioManager,
   type AudioContextFactory,
-  type AudioInfo,
+  type AudioContextLike,
   type VisibilitySource,
 } from './audio/context';
+import type { TimerSource } from './clock/clock';
+import { createPlayheadQueue } from './clock/playhead-queue';
+import { createScheduler, type Scheduler } from './clock/scheduler';
+import { createWorkerTimer } from './clock/worker-timer';
+import type { Command } from './commands';
 import {
   MIN_GAIN,
+  START_DELAY_S,
   TEST_TONE_ATTACK_S,
   TEST_TONE_DECAY_S,
   TEST_TONE_FREQUENCY_HZ,
   TEST_TONE_PEAK_GAIN,
 } from './model/constants';
+import { createInitialState } from './model/defaults';
+import type { EngineState, StepIndex } from './model/types';
+import { reduce } from './state';
+import { createMetronome, type Metronome } from './synth/metronome';
 
 export type { AudioAvailability, AudioInfo } from './audio/context';
-
-export interface EngineState {
-  readonly audio: AudioInfo;
-}
+export type { Command } from './commands';
+export type * from './model/types';
+export { BPM_MAX, BPM_MIN, STEP_COUNT } from './model/constants';
 
 export interface EngineOptions {
   readonly createContext?: AudioContextFactory;
   readonly visibility?: VisibilitySource;
+  readonly timer?: TimerSource;
 }
 
 export interface Engine {
   /** À appeler depuis un geste utilisateur : crée ou reprend l'AudioContext. */
   unlock(): Promise<void>;
+  dispatch(command: Command): void;
   getState(): EngineState;
   subscribe(listener: (state: EngineState) => void): () => void;
+  /** Pour la boucle d'affichage : pas audible à l'instant présent, null à l'arrêt. */
+  audibleStep(): StepIndex | null;
   /** Son bref pour valider la chaîne audio. Provisoire : remplacé par la voix basse au lot 3. */
   playTestTone(): void;
   dispose(): void;
@@ -42,20 +55,76 @@ export interface Engine {
 
 export function createEngine(options: EngineOptions = {}): Engine {
   const audio = createAudioManager(options);
+  const timer = options.timer ?? createWorkerTimer();
+  const playhead = createPlayheadQueue();
   const listeners = new Set<(state: EngineState) => void>();
-  let state: EngineState = { audio: audio.info };
 
-  const stopAudioUpdates = audio.onChange((info) => {
-    state = { ...state, audio: info };
+  let state: EngineState = createInitialState(audio.info);
+  let scheduler: Scheduler | null = null;
+  let metronome: Metronome | null = null;
+
+  const setState = (next: EngineState) => {
+    state = next;
     listeners.forEach((listener) => listener(state));
-  });
+  };
+
+  const stopAudioUpdates = audio.onChange((info) => setState({ ...state, audio: info }));
+
+  const ensureScheduler = (ctx: AudioContextLike): Scheduler => {
+    metronome ??= createMetronome(ctx);
+    scheduler ??= createScheduler({
+      clock: { now: () => ctx.currentTime },
+      timer,
+      getTransport: () => state.transport,
+      onStep: (step, time) => {
+        metronome?.trigger(step, time);
+        playhead.push({ step, time });
+      },
+    });
+    return scheduler;
+  };
+
+  const play = async () => {
+    // `unlock` appelle `resume()` de façon synchrone : si `dispatch` vient d'un
+    // gestionnaire de geste, la politique d'autoplay est satisfaite.
+    await audio.unlock();
+    const ctx = audio.context;
+    if (ctx === null || state.transport.status === 'playing') return;
+    playhead.clear();
+    ensureScheduler(ctx).start(ctx.currentTime + START_DELAY_S);
+    setState(reduce(state, { type: 'transport/play' }));
+  };
+
+  const stop = () => {
+    scheduler?.stop();
+    playhead.clear();
+    setState(reduce(state, { type: 'transport/stop' }));
+  };
 
   return {
     unlock: () => audio.unlock(),
+    dispatch(command) {
+      switch (command.type) {
+        case 'transport/play':
+          void play();
+          return;
+        case 'transport/stop':
+          stop();
+          return;
+        default:
+          setState(reduce(state, command));
+      }
+    },
     getState: () => state,
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
+    },
+    audibleStep() {
+      const ctx = audio.context;
+      if (ctx === null || state.transport.status !== 'playing') return null;
+      // Un événement programmé à t s'entend à t + latence de sortie.
+      return playhead.audibleStep(ctx.currentTime - state.audio.outputLatency);
     },
     playTestTone() {
       const ctx = audio.context;
@@ -83,6 +152,8 @@ export function createEngine(options: EngineOptions = {}): Engine {
       oscillator.stop(stopAt);
     },
     dispose() {
+      scheduler?.stop();
+      timer.dispose();
       stopAudioUpdates();
       listeners.clear();
       audio.dispose();

@@ -47,8 +47,8 @@ export default ts.config(
     },
   },
   {
-    // Seul le worker de timer a le droit de se réveiller périodiquement.
-    files: ['src/engine/clock/timer.worker.ts'],
+    // Seuls le worker de timer et les tests ont le droit d'utiliser les timers du navigateur.
+    files: ['src/engine/clock/timer.worker.ts', 'src/engine/**/*.test.ts'],
     rules: { 'no-restricted-globals': 'off' },
   },
 );

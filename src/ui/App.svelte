@@ -1,16 +1,36 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import AudioGate from './components/AudioGate.svelte';
+  import PlayheadStrip from './components/PlayheadStrip.svelte';
+  import Transport from './components/Transport.svelte';
+  import { createPlayhead } from './playhead/playhead.svelte';
   import { createEngineStore } from './state/engine.svelte';
 
   const engine = createEngineStore();
+  const playhead = createPlayhead(engine);
   onDestroy(() => engine.dispose());
 
   async function unlock() {
     await engine.unlock();
     engine.playTestTone();
   }
+
+  function onKeydown(event: KeyboardEvent) {
+    if (event.code !== 'Space' || event.repeat) return;
+    if (
+      event.target instanceof HTMLElement &&
+      event.target.closest('button, input, select, textarea')
+    ) {
+      return;
+    }
+    event.preventDefault();
+    engine.dispatch({
+      type: engine.state.transport.status === 'playing' ? 'transport/stop' : 'transport/play',
+    });
+  }
 </script>
+
+<svelte:window onkeydown={onKeydown} />
 
 {#if engine.state.audio.availability !== 'running'}
   <AudioGate availability={engine.state.audio.availability} onunlock={unlock} />
@@ -23,9 +43,13 @@
         {Math.round(engine.state.audio.outputLatency * 1000)} ms
       </p>
     </header>
+
     <section class="panel">
-      <p>Lot 0 : la chaîne audio fonctionne. Le séquenceur arrive au lot suivant.</p>
-      <button type="button" class="tone" onclick={() => engine.playTestTone()}>Son de test</button>
+      <Transport transport={engine.state.transport} dispatch={engine.dispatch} />
+    </section>
+
+    <section class="panel">
+      <PlayheadStrip step={playhead.step} />
     </section>
   </main>
 {/if}
@@ -63,31 +87,9 @@
   }
 
   .panel {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-4);
-    flex-wrap: wrap;
     padding: var(--space-5);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     background: var(--color-surface);
-  }
-
-  .panel p {
-    margin: 0;
-  }
-
-  .tone {
-    min-height: var(--control-size);
-    padding: var(--space-2) var(--space-5);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface-raised);
-    cursor: pointer;
-  }
-
-  .tone:hover {
-    border-color: var(--color-accent);
   }
 </style>

@@ -50,9 +50,10 @@ export const STOP_RELEASE_TAU_S = 0.02;
 
 export const CUTOFF_MIN_HZ = 80;
 export const CUTOFF_MAX_HZ = 6000;
-export const RESONANCE_Q_MIN = 0.7;
+/** Q d'un passe-bas en dB : −3 dB est la réponse Butterworth, sans bosse à la coupure. */
+export const RESONANCE_Q_MIN_DB = -3;
 /** Un biquad devient instable au-delà ; le filtre en échelle (v2) ira plus loin. */
-export const RESONANCE_Q_MAX = 18;
+export const RESONANCE_Q_MAX_DB = 18;
 export const DECAY_MIN_S = 0.03;
 export const DECAY_MAX_S = 2;
 /** Ouverture maximale du filtre par l'enveloppe, en octaves au-dessus du cutoff. */

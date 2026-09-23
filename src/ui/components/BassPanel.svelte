@@ -70,7 +70,7 @@
       label="Reso"
       value={bass.resonance}
       defaultValue={0.6}
-      format={(v) => `Q ${resonanceToQ(v).toFixed(1)}`}
+      format={(v) => `${resonanceToQ(v).toFixed(1)} dB`}
       onchange={set('resonance')}
     />
     <Knob

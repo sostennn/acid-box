@@ -1,13 +1,13 @@
 # Invariants d'acid-box pour la revue
 
-<!-- forged-by: forging-review-skill · 2026-09-23 · sources : README.md, docs/PLAN.md, eslint.config.js, .stylelintrc.json, tsconfig.app.json, code de main à 577e06d, revue de la PR #4 -->
+<!-- forged-by: forging-review-skill · 2026-09-23 · sources : README.md, docs/PLAN.md, eslint.config.js, .stylelintrc.json, tsconfig.app.json, code de main -->
 
-Dérivés de `README.md`, `docs/PLAN.md` (§2 stack, §3 arborescence, §4 modèle, §7 risques,
-hypothèses H1 à H12), des configs d'outillage et du code de `main` à la fusion de la PR #4
-(`577e06d`, lots 0 à 4 livrés), y compris les corrections décidées pendant la revue de
-cette PR. État au 2026-09-23. Si le plan ou le code ont bougé depuis, ils font foi. Le plan
-est en retard sur le code sur plusieurs points (§4, §6.1, §7) : la liste est dans la
-section « Dette connue » de `lot-checklists.md`, et c'est le code qui fait foi.
+Des règles, pas une photo du code. Chaque règle cite sa source dans `README.md`,
+`docs/PLAN.md` (décisions, hypothèses H1 à H12, risques §7, décisions du lot 4) ou les
+configs d'outillage. Les valeurs vivent dans `src/engine/model/constants.ts` et
+`src/ui/theme/tokens.css`, l'état des lots dans le README, la dette et les points ouverts
+dans la section « Dette et points ouverts » de `docs/PLAN.md` : les relire à la version
+revue plutôt que de s'en souvenir. État au 2026-09-23 ; le code et le plan font foi.
 
 Chaque invariant donne : la règle, sa source, comment le vérifier sur une PR, et la
 sévérité si la PR le viole. La mention « Outillage » indique ce qui est déjà garanti par
@@ -20,28 +20,18 @@ A et C0 sont transverses : les lire quel que soit le domaine revu.
 
 ## Repères temporels
 
-Les findings de timing sont des comparaisons de durées. Valeurs dérivées de `constants.ts`
-et `tokens.css` :
+Les findings de timing comparent des durées. Les calculer à partir des constantes lues à
+la version revue, aux tempos extrêmes `BPM_MIN` et `BPM_MAX` :
 
-| Grandeur                                                                            | Valeur                                                                       |
-| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Durée d'un pas (double-croche)                                                      | 375 ms à `BPM_MIN` 40 · 120 ms à `BPM_DEFAULT` 125 · 62,5 ms à `BPM_MAX` 240 |
-| Gate d'un pas (`GATE_RATIO` 0,55)                                                   | 206 ms · 66 ms · 34 ms aux mêmes tempos                                      |
-| Retard maximal d'un 16e impair (`SHUFFLE_MAX_RATIO` 0,5 × pas)                      | 60 ms à 125 BPM                                                              |
-| Fenêtre de lookahead `SCHEDULE_AHEAD_S` / réveil `SCHEDULE_INTERVAL_MS`             | 100 ms / 25 ms                                                               |
-| Pas encore programmés en retard jusqu'à `MAX_LATE_S`                                | 250 ms, soit plus de deux pas à 125 BPM                                      |
-| Marge `SCHEDULE_EPSILON_S`                                                          | 1 ms                                                                         |
-| Lissage des knobs `KNOB_SMOOTHING_S`                                                | 10 ms (τ)                                                                    |
-| Enveloppes VCA : attaque / relâchement / arrêt (τ)                                  | 1 ms / 8 ms / 20 ms                                                          |
-| Créneau minimal d'un 16e impair, shuffle 1 (`D·(1 − SHUFFLE_MAX_RATIO)`)            | 60 ms à 125 BPM · 31 ms à `BPM_MAX` 240                                      |
-| Glissé du slide `SLIDE_TAU_S` (τ)                                                   | 20 ms, soit 95 % du chemin en 60 ms                                          |
-| Decay du filtre (τ, knob decay) `DECAY_MIN_S` → `DECAY_MAX_S`                       | 20 ms → 600 ms ; 161 ms n'est plus le défaut, le préréglage vaut 66 ms       |
-| Decay d'un pas accentué `ACCENT_ENV_DECAY_S` (τ)                                    | 50 ms, quel que soit le knob decay                                           |
-| Retour de Q après un accent `ACCENT_Q_HOLD_S`                                       | 10 ms après le temps du pas                                                  |
-| Q du filtre `RESONANCE_Q_MIN_DB` → `RESONANCE_Q_MAX_DB`, accent `ACCENT_Q_BOOST_DB` | −3 dB → 18 dB, linéaire sur le knob ; +6 dB par accent, borné à 18 dB        |
-| Transition visuelle `--duration-fast`                                               | 120 ms, soit un pas entier à 125 BPM                                         |
-
-Un `setTargetAtTime` atteint 63 % de sa cible à τ, 95 % à 3τ, 99 % à 5τ.
+| Grandeur                                        | Formule                                                                       |
+| ----------------------------------------------- | ----------------------------------------------------------------------------- |
+| Durée d'un pas D (double-croche)                | `stepDurationSeconds(bpm)` = 60 / bpm / 4                                     |
+| Gate d'un pas                                   | `GATE_RATIO` · D                                                              |
+| Retard d'un 16e impair                          | shuffle · `SHUFFLE_MAX_RATIO` · D                                             |
+| Créneau minimal jusqu'au prochain onset         | D · (1 − `SHUFFLE_MAX_RATIO`), 16e impair à shuffle 1, calculé à `BPM_MAX`    |
+| Fenêtre de programmation                        | `SCHEDULE_AHEAD_S`, réveil `SCHEDULE_INTERVAL_MS`, retard toléré `MAX_LATE_S` |
+| Constantes de temps (`*_TAU_S`, decay, lissage) | τ : 63 % de la cible à τ, 95 % à 3τ, 99 % à 5τ                                |
+| Transition visuelle `--duration-fast`           | à comparer à D à `BPM_MAX` pour tout état piloté par la tête de lecture       |
 
 ---
 
@@ -76,7 +66,7 @@ explicite et vérifiée ».
 
 - Règle : l'UI importe depuis `@engine` (c'est `src/engine/index.ts`), pas depuis
   `@engine/…`. Ce qu'un composant a besoin d'afficher ou de convertir est ré-exporté par
-  `index.ts` (`cutoffToHz`, `resonanceToQ`, `pitchLabel`, `holdContext`, `DEFAULT_BASS`, constantes).
+  `index.ts` : relire ses ré-exports à la version revue.
   Une valeur par défaut recopiée dans un composant faute d'export est un manque d'export,
   pas une raison de la recopier. Les tests et `tests/fakes` peuvent importer les internes.
 - Vérifier : `grep -rn "from '@engine/" src/ui` sur le diff.
@@ -125,10 +115,9 @@ dans le passé », « Édition d'un pas déjà programmé », H10, H12.
   décale de `SCHEDULE_EPSILON_S` après `currentTime`. `bass-voice.apply` le fait pour tous
   les événements d'un plan ; `release` aussi. Toute nouvelle voix (drums, sidechain) fait
   pareil.
-- Point ouvert : appliqué événement par événement, `safeTime` écrase les durées internes
-  d'un pas très en retard (attaque et relâchement ramenés au même instant). Un décalage
-  unique par pas préserverait la forme du plan. À trancher par l'auteur ; ne pas exiger
-  l'un ou l'autre, mais signaler tout nouveau code qui hérite du même comportement.
+- Point ouvert (PLAN, « Dette et points ouverts ») : appliqué événement par événement,
+  `safeTime` écrase les durées d'un pas très en retard. Ne pas exiger de solution, mais
+  signaler tout nouveau code qui hérite du même comportement.
 - Vérifier : chaque site d'écriture d'AudioParam ou de `source.start(t)` dans une nouvelle
   voix passe par `safeTime` ou reçoit un temps qui en vient.
 - Sévérité : Bloquant — Edge.
@@ -215,55 +204,42 @@ réutilisables », « Automations qui se chevauchent », « Clics à l'arrêt »
 
 ### C2 — Rampes : jamais vers ≤ 0, toujours ancrées, et évitées dans les plans
 
-- Règle : depuis le lot 4, la voix basse n'emploie plus aucune rampe. `ParamEvent` n'a que
-  `cancel`, `set` et `target` ; enveloppes et glissé du slide passent par
-  `setTargetAtTime`, qui part de la valeur courante, tolère une cible 0 et, posé au temps
-  du pas, ne peut pas être effacé par le `cancel` du pas suivant (C12). Toute rampe
-  réintroduite (drums, sidechain, nouvelle voix) a une valeur strictement positive
-  (plancher `MIN_GAIN`, fréquence > 0), une ancre `set` sur la même cible à un temps ≤ au
-  sien, et une échéance qui tient dans le créneau du pas.
-- Outillage : `FakeAudioParam` lève sur une rampe exponentielle vers ≤ 0, mais seulement
-  si un test exerce le chemin.
-- Vérifier : `grep -nE "exponentialRamp|linearRamp|'expRamp'"` sur le diff moteur ; chaque
-  occurrence a sa valeur > 0, son ancre et son échéance comparée au créneau (C12). Ne pas
-  exiger d'ancre devant un `setTargetAtTime` : c'est justement ce qui le rend robuste.
+- Source : PLAN §7 « Rampes exponentielles et zéro ».
+- Règle : les plans préfèrent `setTargetAtTime`, qui part de la valeur courante, tolère
+  une cible 0 et, posé au temps du pas, survit au `cancel` du pas suivant (C12). Toute
+  rampe a une valeur strictement positive (plancher `MIN_GAIN`, fréquence > 0), une ancre
+  `set` sur la même cible à un temps ≤ au sien, et une échéance qui tient dans le créneau.
+- Outillage : le faux AudioContext lève sur une rampe exponentielle vers ≤ 0, si un test
+  exerce le chemin.
+- Vérifier : `grep -nE "exponentialRamp|linearRamp|Ramp'"` sur le diff moteur ; chaque
+  occurrence a sa valeur > 0, son ancre et son échéance (C12). Ne pas exiger d'ancre devant
+  un `setTargetAtTime` : c'est justement ce qui le rend robuste.
 - Sévérité : Bloquant — Edge.
 
 ### C3 — Avant chaque pas : `cancelScheduledValues` puis ré-ancrage
 
-- Règle : à tempo élevé ou avec slide + accent, les automations se chevauchent. Chaque
-  cible touchée par un pas commence par `cancel` à `time` puis `set` ou `target`. Pas de
-  `cancelAndHoldAtTime`, absent de Firefox. Cibles touchées au lot 4 :
-  - pas joué non tenu : `frequency`, `filterDetune`, `vca` ; `filterQ` seulement sur un
-    accent, les pas sans accent ne touchent pas à Q et le knob garde la main ;
-  - pas d'arrivée d'un slide (tenu) : `frequency` seule (`cancel` puis `target`), plus la
-    fermeture du VCA sans `cancel`, tolérée parce que le pas d'origine a annulé le VCA à
-    son propre temps et n'a rien posé après ;
-  - silence : rien.
-- PLAN §7 parle d'un ré-ancrage par `setValueAtTime` : le code emploie `target` quand la
-  courbe doit partir de la valeur courante (attaque du VCA, glissé). C'est conforme à
-  l'intention de la parade, pas une dérive à reprocher.
+- Source : PLAN §7 « Automations qui se chevauchent ».
+- Règle : chaque cible touchée par un pas commence par `cancel` à `time`, puis `set` ou
+  `target`. Pas de `cancelAndHoldAtTime`, absent de Firefox. Les pas sans accent ne
+  touchent pas à Q : le knob garde la main. Exception tolérée : sur un pas d'arrivée de
+  slide, la fermeture du VCA sans `cancel`, le pas d'origine ayant annulé le VCA à son temps
+  sans rien poser après.
 - Vérifier : dans un plan, la première opération sur une cible pour un pas donné est un
-  `cancel`, hors l'exception ci-dessus ; une nouvelle cible touchée par tous les pas
-  (sidechain, drums) suit la même règle.
+  `cancel` ; lire la liste des cibles dans le `ParamTarget` du plan revu.
 - Sévérité : Bloquant — Edge.
 
 ### C4 — Un knob ne cancel jamais, et garde le dernier mot sur les retours programmés
 
-- Règle : les écritures de knob se composent avec les enveloppes en cours grâce à
-  `setTargetAtTime`. Un `cancelScheduledValues` depuis un gestionnaire de knob tuerait
-  l'enveloppe du pas en cours. Quand un plan ramène un paramètre « à la valeur du knob »
-  (retour de Q après un accent), cette valeur est figée au moment de la programmation, une
-  fenêtre de lookahead plus tôt : la voix garde donc la dernière valeur du knob et le
-  dernier retour programmé (`pendingQReturn` dans `bass-voice.ts`), et `applyParams`
-  reprogramme ce retour par `setTargetAtTime` à son temps, sans `cancel`.
-- Limite connue et acceptée : deux accents dans la même fenêtre de lookahead ; le retour du
-  premier reste figé pendant au plus un pas.
-- Vérifier : `applyParams`, `applyMix`, `setAmount` et tout équivalent futur ne
-  contiennent que des `smoothSet`, plus ce retour reprogrammé ; tout nouvel événement de
-  plan qui recopie la valeur d'un knob dans le futur a le même mécanisme.
-- Sévérité : Bloquant — Reliability. Un geste de knob écrasé jusqu'au prochain accent est un
-  bug démontrable.
+- Source : PLAN §7 « Automations qui se chevauchent », décisions du lot 4.
+- Règle : les écritures de knob se composent avec les enveloppes grâce à
+  `setTargetAtTime` ; un `cancelScheduledValues` depuis un gestionnaire de knob tuerait
+  l'enveloppe du pas en cours. Un retour « à la valeur du knob » programmé par un plan est
+  figé une fenêtre de lookahead plus tôt : la voix garde la dernière valeur du knob et
+  reprogramme ce retour quand le knob bouge, sans `cancel`.
+- Vérifier : `applyParams`, `applyMix`, `setAmount` et leurs équivalents ne contiennent que
+  des `smoothSet`, plus ce retour reprogrammé ; tout nouvel événement de plan qui recopie la
+  valeur d'un knob dans le futur a le même mécanisme.
+- Sévérité : Bloquant — Reliability.
 
 ### C5 — Oscillateur de basse persistant, nœuds de drums par frappe
 
@@ -278,25 +254,22 @@ réutilisables », « Automations qui se chevauchent », « Clics à l'arrêt »
 
 ### C6 — Stop sans clic, forme d'onde à chaud
 
+- Source : PLAN §7 « Clics à l'arrêt », décisions du lot 4.
 - Règle : `release(time)` annule le futur sur toutes les cibles, referme le VCA par
-  `setTargetAtTime(MIN_GAIN, t, STOP_RELEASE_TAU_S)`, ramène Q à la valeur du knob (le
-  `cancel` a pu effacer le retour d'un accent en cours) et remet à zéro l'état de la voix
-  (`noteOpen`, `pendingQReturn`). Un glissé en cours n'est pas coupé : son
-  `setTargetAtTime` est antérieur à `at` et continue, sans saut de hauteur. `osc.type`
-  change sans recréer le nœud. Toute nouvelle voix expose un `release` appelé par `stop()`
-  dans `index.ts`.
+  `setTargetAtTime(MIN_GAIN, t, STOP_RELEASE_TAU_S)`, ramène au knob tout paramètre qu'un
+  `cancel` peut laisser « poussé » (Q après un accent) et remet à zéro l'état mémorisé par
+  la voix. `osc.type` change sans recréer le nœud. Toute nouvelle voix expose un `release`
+  appelé par `stop()` dans `index.ts`.
 - Vérifier : `stop()` appelle le `release` de chaque voix ; aucun `gain.value = 0` ; tout
-  nouvel état mémorisé par une voix est remis à zéro dans `release` ; toute cible qu'un
-  `cancel` peut laisser sur une valeur « poussée » est ré-ancrée sur la valeur du knob.
+  nouvel état de voix est remis à zéro dans `release`.
 - Sévérité : Bloquant — Edge.
 
 ### C7 — Filtre : `frequency` pour le knob, `detune` pour l'enveloppe, Q borné
 
 - Règle : deux paramètres séparés pour que knob et enveloppe ne se battent jamais ;
-  l'enveloppe est exponentielle en octaves via les cents. Q en dB, linéaire sur le knob de
-  `RESONANCE_Q_MIN_DB` (−3 dB, réponse Butterworth) à `RESONANCE_Q_MAX_DB` (18 dB) par
-  `resonanceToQ` ; un pas accentué passe par `accentedQ`, poussée additive en dB bornée par
-  `RESONANCE_Q_MAX_DB`. Le filtre passe par l'interface `FilterStage` (biquad v1, worklet
+  l'enveloppe est exponentielle en octaves via les cents. Q d'un passe-bas en dB, linéaire
+  sur le knob (`resonanceToQ`), borné par `RESONANCE_Q_MAX_DB`, accent compris
+  (`accentedQ`, poussée additive en dB). Le filtre passe par l'interface `FilterStage` (biquad v1, worklet
   v2).
 - Vérifier : toute nouvelle modulation du filtre passe par `detune` ; aucun accès direct
   au `BiquadFilterNode` hors `filter-stage.ts` ; toute valeur de Q vient de `resonanceToQ`
@@ -333,33 +306,25 @@ réutilisables », « Automations qui se chevauchent », « Clics à l'arrêt »
 
 ### C11 — La liaison se décide d'après ce que la voix a joué
 
-- Source : PLAN §5 lot 4 (« la liaison est décidée par la voix d'après ce qu'elle a
-  réellement joué »), bug trouvé en revue de la PR #4.
-- Règle : le plan reçoit `held` de la voix. `noteOpen` vaut le `slide` du dernier pas joué
-  réellement programmé ; un silence ne le change pas ; `release` le remet à `false`. Le
-  pattern (`holdContext`) ne sert qu'à l'indication « tenu » de l'interface. Déduire la
-  tenue du pattern rend une note muette : slide sur le pas 15 puis play, stop puis play,
-  slide ajouté à un pas déjà programmé, pattern d'un seul pas slidé. Le glissé part de la
-  hauteur qui sonne, pas de la note du pas précédent lue dans le pattern.
-- Vérifier : `grep -rn holdContext src/engine` ne sort que `model/pattern.ts` et l'export
-  de `index.ts` ; `planStep` ne reçoit ni le pattern ni le pas précédent ; tout futur état
-  « ce qui sonne » (choke du hat ouvert au lot 5) vit dans la voix, pas dans le pattern.
-- Sévérité : Bloquant — Edge.
+- Source : PLAN §5 lot 4, décisions prises en revue.
+- Règle : le plan reçoit `held` de la voix, qui retient si la dernière note jouée portait
+  un slide ; un silence ne change rien, `release` remet à zéro. Le pattern (`holdContext`)
+  ne sert qu'à l'indication « tenu » de l'interface. Le glissé part de la hauteur qui
+  sonne, pas d'une note lue dans le pattern.
+- Vérifier : `grep -rn holdContext src/engine` ne sort que `model/pattern.ts` et son
+  ré-export ; `planStep` ne reçoit ni le pattern ni le pas précédent ; tout futur état « ce
+  qui sonne » (choke du hat au lot 5) vit dans la voix.
+- Sévérité : Bloquant — Edge : déduire la tenue du pattern rend une note muette.
 
 ### C12 — Un événement futur d'un pas ne compte pas survivre au `cancel` du pas suivant
 
-- Source : checklist du lot 4 (durées dérivées et créneau réel, shuffle compris), C0
-  (`cancelScheduledValues(t)` efface tout ce qui est ≥ t), revue de la PR #4.
-- Règle : le pas joué suivant annule sa cible dès son temps. Un événement posé à
-  `time + X` n'est garanti que si X est inférieur au créneau réel jusqu'au prochain onset,
-  qui descend à `D·(1 − SHUFFLE_MAX_RATIO)` pour un 16e impair (31 ms à 240 BPM,
-  shuffle 1). Au-delà, poser l'événement à `time` sous forme de `setTargetAtTime` (comme
-  le glissé), ou borner X par le créneau réel, que le plan ne reçoit pas aujourd'hui.
-  Tolérés : le retour de Q à `ACCENT_Q_HOLD_S` (10 ms) ; la fermeture de gate à
-  `GATE_RATIO · D`, point ouvert, effacée seulement au-delà d'un shuffle de 0,9 et alors
-  remplacée par l'attaque du pas suivant.
-- Vérifier : pour chaque nouvel événement à `time + X` dans un plan, comparer X à 31 ms,
-  puis au créneau à 125 BPM shuffle 1 (60 ms).
+- Source : PLAN §5 lot 4, décisions prises en revue ; PLAN §7 « Événement d'un pas effacé
+  par le pas suivant » ; C0 (`cancelScheduledValues(t)` efface tout ce qui est ≥ t).
+- Règle : un événement posé à `time + X` n'est garanti que si X est inférieur au créneau
+  minimal (repères temporels). Au-delà, le poser au temps du pas en `setTargetAtTime`, ou le
+  borner par le créneau réel. Toléré : la fermeture de gate, point ouvert du plan.
+- Vérifier : pour chaque nouvel événement à `time + X` dans un plan, calculer le créneau
+  minimal à `BPM_MAX` et le comparer à X.
 - Sévérité : Bloquant — Edge si un événement audible est perdu pour un BPM et un shuffle
   concrets ; Suggestion sinon.
 
@@ -390,8 +355,7 @@ Source : PLAN §4, H3 à H9, README « Ce qui décide est pur ».
 - Vérifier : les littéraux numériques nouveaux dans le diff moteur ; les valeurs par
   défaut recopiées dans l'UI (un `defaultValue={0.8}` qui redouble `DEFAULT_MIX`, un
   `125` qui redouble `BPM_DEFAULT`) sont des duplications à faire passer par un export
-  de `@engine`. Le modèle à suivre est `DEFAULT_BASS`, exporté depuis le lot 4 et lu par
-  `BassPanel.svelte` pour le double-tap.
+  de `@engine`, comme `DEFAULT_BASS` pour le panneau basse.
 - Sévérité : Suggestion — Clarity ; Bloquant si la même valeur de réglage existe à deux
   endroits qui peuvent diverger.
 
@@ -479,8 +443,8 @@ vérité », H2, H11, lot 2, cible « Desktop + tablette paysage ».
   PageUp/PageDown, Home/End ; `role="slider"`, `aria-label`, `aria-valuemin/max/now`,
   `aria-valuetext` lisible, `tabindex="0"`, anneau `:focus-visible` via token. Les
   boutons à état portent `aria-pressed`. Textes et `aria-label` en français (H2).
-- `knobDrag` est **continu** : `KNOB_DRAG_RANGE_PX = 200` (toute la plage sur 200 px),
-  `KNOB_KEY_STEP = 0.01`, `KNOB_KEY_PAGE_STEP = 0.1`, `KNOB_FINE_FACTOR = 0.125`, et il
+- `knobDrag` est **continu** (`KNOB_DRAG_RANGE_PX`, `KNOB_KEY_STEP`, `KNOB_KEY_PAGE_STEP`,
+  `KNOB_FINE_FACTOR` dans `gestures/knob-math.ts`), et il
   relit `getValue()` à chaque événement. Un consommateur à valeurs discrètes (hauteur sur
   36 demi-tons, vélocité par pas) qui renvoie une valeur déjà quantifiée perd tout
   déplacement inférieur à un cran : drag lent et flèches ne font rien, Shift devient
@@ -488,7 +452,7 @@ vérité », H2, H11, lot 2, cible « Desktop + tablette paysage ».
   quantifié pendant le geste.
 - Vérifier : tout nouveau contrôle draggable réutilise `knobDrag` plutôt qu'un geste ad
   hoc ; tout contrôle nouveau ou modifié est opérable au clavier (flèches comprises) et au
-  doigt, avec une cible d'au moins `--control-size` (44 px) ; les tests happy-dom couvrent
+  doigt, avec une cible d'au moins `--control-size` ; les tests happy-dom couvrent
   le clavier avec les flèches, un drag en plusieurs petits mouvements, et l'ARIA.
 - Sévérité : Bloquant — Edge pour un contrôle nouveau ou modifié inopérable au clavier ou
   au doigt, ou pour une régression d'accessibilité ; Suggestion sinon.
@@ -513,9 +477,9 @@ vérité », H2, H11, lot 2, cible « Desktop + tablette paysage ».
 - Règle : la barre d'espace bascule play/stop sauf quand le focus est sur un contrôle
   (`button, input, select, textarea, [role="slider"]`) et ignore `event.repeat`. Tout
   nouveau raccourci global suit la même garde.
-- Point ouvert : `knobDrag` pose le focus sur le slider au `pointerdown`, donc la garde
-  neutralise l'espace après tout geste sur un knob ou un pas (H11). Toute modification de
-  la garde ou du geste doit le prendre en compte.
+- Point ouvert (PLAN, « Dette et points ouverts ») : la garde neutralise l'espace après
+  tout geste sur un knob ou un pas. Toute modification de la garde ou du geste doit le
+  prendre en compte.
 - Sévérité : Suggestion — Edge.
 
 ### E6 — Cible d'écran et tactile

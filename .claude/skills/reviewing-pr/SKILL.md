@@ -17,7 +17,7 @@ allowed-tools: Bash(gh:*) Bash(git:*) Bash(pnpm:*) Bash(jq:*) Bash(mktemp:*) Bas
 
 # Revue de PR — acid-box
 
-<!-- forged-by: forging-review-skill · 2026-09-23 · sources : README.md, docs/PLAN.md, configs d'outillage, code de main à 577e06d, PR #1 à #5 -->
+<!-- forged-by: forging-review-skill · 2026-09-23 · sources : README.md, docs/PLAN.md, configs d'outillage, code de main -->
 
 Ce dépôt a un contrat écrit inhabituellement précis : cinq principes d'architecture dans le
 README, douze hypothèses tranchées, un découpage en lots, une stratégie de tests module par
@@ -134,12 +134,15 @@ plusieurs passes par domaine.
    Sa section C0 (unités Web Audio) et ses repères temporels servent à chaque finding qui
    compare des durées ou des unités.
 2. Identifier le lot de la PR avec `references/lot-checklists.md`, section « Identifier le
-   lot », puis lire la section de ce lot. Sans lot identifiable, utiliser la checklist
-   « Hors lot ». Le code fait foi : si la checklist attribue au lot quelque chose que la PR
-   n'a pas, ou l'inverse, le noter en « Hors périmètre » et continuer.
-3. Si la PR modifie `docs/PLAN.md` ou `README.md`, lire ces hunks. Les références de ce
-   skill datent du 2026-09-23 : le plan fait foi, et le rapport signalera que le skill
-   doit être rafraîchi.
+   lot », puis lire la section de ce lot ; l'état des lots est dans la feuille de route du
+   README. Sans lot identifiable, utiliser la checklist « PR hors lot ». Le code fait foi :
+   un écart entre la checklist et la PR va en « Hors périmètre ».
+3. Lire la section « Dette et points ouverts » de `docs/PLAN.md`, et les hunks de
+   `docs/PLAN.md` ou `README.md` que la PR modifie. Le skill ne porte que des règles qui
+   citent le plan : une PR qui change une décision la change dans le plan. Une règle du
+   skill contredite par le plan ou le code : le plan fait foi, et le rapport propose deux
+   lignes dans le bloc « Ajouts manuels » d'`invariants.md` ; un `--refresh` complet est
+   réservé aux refontes du plan.
 4. Cartographier les fichiers touchés vers les domaines. La dernière colonne liste le
    contexte hors diff à relire pour vérifier les invariants du domaine :
 
@@ -264,7 +267,7 @@ finding candidat :
 2. Chercher si l'invariant est déjà assuré ailleurs. Exemples réels : `safeTime` dans
    `bass-voice.apply` couvre tous les événements d'un plan, donc `bass-plan.ts` n'a pas
    à borner ses temps ; `clamp` dans le reducer couvre les valeurs venues de l'interface ;
-   `smoothSet` dans `applyMix` couvre les gains du mix ; `noteOpen` dans la voix décide la
+   `smoothSet` dans `applyMix` couvre les gains du mix ; l'état de la voix décide la
    liaison, donc `bass-plan.ts` n'a pas à lire le pattern.
 3. Confirmer que la ligne pointée existe côté nouveau fichier et fait partie du diff.
    Sinon, choisir la ligne du diff la plus proche ou basculer en commentaire global.

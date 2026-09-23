@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { FakeAudioContext } from '../../../../tests/fakes/fake-audio-context';
-import { MIN_GAIN } from '../../model/constants';
+import { ACCENT_Q_HOLD_S, MIN_GAIN } from '../../model/constants';
 import { DEFAULT_BASS, DEFAULT_STEP } from '../../model/defaults';
-import { cutoffToHz } from '../../model/mapping';
+import { accentedQ, cutoffToHz, resonanceToQ } from '../../model/mapping';
+import { midiToFrequency } from '../../model/pitch';
 import { createBiquadFilterStage } from '../filter-stage';
 import { createBassVoice } from './bass-voice';
+
+const plan = (time: number, step = DEFAULT_STEP) => ({
+  step,
+  params: DEFAULT_BASS,
+  time,
+  stepDuration: 0.125,
+});
 
 function setup() {
   const ctx = new FakeAudioContext();
@@ -33,7 +41,7 @@ describe('createBassVoice', () => {
 
   it('cent déclenchements n’allouent aucune nouvelle source', () => {
     const { ctx, voice, oscillator } = setup();
-    for (let i = 0; i < 100; i += 1) voice.trigger(DEFAULT_STEP, i * 0.125, 0.125, DEFAULT_BASS);
+    for (let i = 0; i < 100; i += 1) voice.trigger(plan(i * 0.125));
     expect(ctx.oscillators).toHaveLength(1);
     expect(oscillator?.frequency.calls.filter((c) => c.method === 'setValueAtTime')).toHaveLength(
       100,
@@ -43,7 +51,7 @@ describe('createBassVoice', () => {
   it('applique le plan sur les bons paramètres, sans programmer dans le passé', () => {
     const { ctx, voice, oscillator, filter } = setup();
     ctx.currentTime = 5;
-    voice.trigger({ ...DEFAULT_STEP, note: 0, octave: 0 }, 4.9, 0.125, DEFAULT_BASS);
+    voice.trigger(plan(4.9));
     const vca = ctx.gains.find((g) => g.gain.calls.some((c) => c.value === 1));
 
     expect(oscillator?.frequency.calls.at(-1)?.time).toBeGreaterThan(5);
@@ -67,7 +75,7 @@ describe('createBassVoice', () => {
 
   it('release annule le futur et referme le VCA sans clic', () => {
     const { ctx, voice, oscillator } = setup();
-    voice.trigger(DEFAULT_STEP, 1, 0.125, DEFAULT_BASS);
+    voice.trigger(plan(1));
     voice.release(1.05);
     expect(oscillator?.frequency.calls.at(-1)).toMatchObject({
       method: 'cancelScheduledValues',
@@ -80,6 +88,98 @@ describe('createBassVoice', () => {
       time: 1.05,
     });
     expect(ctx.oscillators[0]?.stoppedAt).toBeNull();
+  });
+
+  it('mappe la cible filterQ sur le Q du filtre', () => {
+    const { voice, filter } = setup();
+    voice.trigger(plan(1, { ...DEFAULT_STEP, accent: true }));
+    expect(filter?.Q.calls).toContainEqual(
+      expect.objectContaining({
+        method: 'setTargetAtTime',
+        time: 1,
+        value: accentedQ(DEFAULT_BASS.resonance, DEFAULT_BASS.accent),
+      }),
+    );
+  });
+
+  it('le pas qui suit un slide glisse vers sa note sans rouvrir le VCA', () => {
+    const { ctx, voice, oscillator } = setup();
+    voice.trigger(plan(1, { ...DEFAULT_STEP, slide: true }));
+    const vca = ctx.gains.find((g) => g.gain.calls.some((c) => c.value === 1));
+    const vcaCalls = vca?.gain.calls.length;
+
+    voice.trigger(plan(1.125, { ...DEFAULT_STEP, note: 7 }));
+    expect(oscillator?.frequency.calls.at(-1)).toMatchObject({
+      method: 'setTargetAtTime',
+      time: 1.125,
+      value: midiToFrequency(43),
+    });
+    expect(vca?.gain.calls.slice(vcaCalls ?? 0).some((c) => c.value === 1)).toBe(false);
+  });
+
+  it('après un stop, le pas qui suit un slide rejoue la note au lieu de glisser dans le silence', () => {
+    const { ctx, voice, oscillator } = setup();
+    voice.trigger(plan(1, { ...DEFAULT_STEP, slide: true }));
+    voice.release(1.05);
+
+    voice.trigger(plan(2, { ...DEFAULT_STEP, note: 7 }));
+    expect(oscillator?.frequency.calls.at(-1)).toMatchObject({
+      method: 'setValueAtTime',
+      time: 2,
+      value: midiToFrequency(43),
+    });
+    const vca = ctx.gains.find((g) => g.gain.calls.some((c) => c.value === 1));
+    expect(vca?.gain.calls).toContainEqual(
+      expect.objectContaining({ method: 'setTargetAtTime', time: 2, value: 1 }),
+    );
+  });
+
+  it('un silence entre le slide et le pas suivant ne coupe pas la liaison', () => {
+    const { voice, oscillator } = setup();
+    voice.trigger(plan(1, { ...DEFAULT_STEP, slide: true }));
+    voice.trigger(plan(1.125, { ...DEFAULT_STEP, rest: true }));
+    voice.trigger(plan(1.25, { ...DEFAULT_STEP, note: 7 }));
+    expect(oscillator?.frequency.calls.at(-1)).toMatchObject({
+      method: 'setTargetAtTime',
+      time: 1.25,
+      value: midiToFrequency(43),
+    });
+  });
+
+  it('un geste de résonance fait avant un accent programmé l’emporte après l’accent', () => {
+    const { ctx, voice, filter } = setup();
+    ctx.currentTime = 0.9;
+    voice.trigger(plan(1, { ...DEFAULT_STEP, accent: true }));
+    voice.applyParams({ ...DEFAULT_BASS, resonance: 1 });
+
+    const returns = filter?.Q.calls.filter((c) => c.time === 1 + ACCENT_Q_HOLD_S) ?? [];
+    expect(returns.map((c) => c.value)).toEqual([
+      resonanceToQ(DEFAULT_BASS.resonance),
+      resonanceToQ(1),
+    ]);
+  });
+
+  it('un geste de résonance sans accent à venir n’écrit que la valeur lissée', () => {
+    const { ctx, voice, filter } = setup();
+    voice.trigger(plan(1, { ...DEFAULT_STEP, accent: true }));
+    ctx.currentTime = 2;
+    const before = filter?.Q.calls.length ?? 0;
+    voice.applyParams({ ...DEFAULT_BASS, resonance: 1 });
+    expect(filter?.Q.calls.slice(before)).toEqual([
+      { method: 'setTargetAtTime', time: 2, value: resonanceToQ(1) },
+    ]);
+  });
+
+  it('un stop pendant un accent ramène la résonance au knob', () => {
+    const { ctx, voice, filter } = setup();
+    voice.trigger(plan(1, { ...DEFAULT_STEP, accent: true }));
+    ctx.currentTime = 1.004;
+    voice.release(1.005);
+    expect(filter?.Q.calls.at(-1)).toMatchObject({
+      method: 'setTargetAtTime',
+      time: 1.005,
+      value: resonanceToQ(DEFAULT_BASS.resonance),
+    });
   });
 
   it('dispose arrête l’oscillateur', () => {

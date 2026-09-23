@@ -3,6 +3,7 @@
  * Chaque courbe est nommée pour que son intention soit lisible.
  */
 import {
+  ACCENT_Q_BOOST_DB,
   CUTOFF_MAX_HZ,
   CUTOFF_MIN_HZ,
   DECAY_MAX_S,
@@ -39,6 +40,11 @@ export function cutoffToHz(cutoff: Normalized): number {
  */
 export function resonanceToQ(resonance: Normalized): number {
   return RESONANCE_Q_MIN_DB + resonance * (RESONANCE_Q_MAX_DB - RESONANCE_Q_MIN_DB);
+}
+
+/** Q d'un pas accentué : poussée fixe en dB, jamais au-delà de la borne du biquad. */
+export function accentedQ(resonance: Normalized, accent: Normalized): number {
+  return Math.min(RESONANCE_Q_MAX_DB, resonanceToQ(resonance) + accent * ACCENT_Q_BOOST_DB);
 }
 
 /** Constante de temps de la décroissance du filtre. */

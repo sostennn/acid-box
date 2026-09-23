@@ -69,4 +69,5 @@
   --step-active-ring: inset 0 0 0 2px var(--step-cell-active);
   --step-flag-on: var(--color-accent);
   --step-flag-off: var(--color-border);
+  --step-held-color: var(--color-accent);
 }

@@ -8,10 +8,16 @@ const step = { note: 0, octave: 0, accent: false, slide: false, rest: false } as
 describe('StepCell', () => {
   it('affiche la hauteur et bascule le silence', async () => {
     const dispatch = vi.fn();
-    const { getByRole } = render(StepCell, { index: 2, step, active: false, dispatch });
+    const { getByRole } = render(StepCell, {
+      index: 2,
+      step,
+      active: false,
+      held: false,
+      dispatch,
+    });
     expect(getByRole('slider').textContent?.trim()).toBe('C2');
 
-    await fireEvent.click(getByRole('button'));
+    await fireEvent.click(getByRole('button', { name: /joué/ }));
     expect(dispatch).toHaveBeenCalledWith({
       type: 'pattern/toggleStepFlag',
       index: 2,
@@ -19,9 +25,49 @@ describe('StepCell', () => {
     });
   });
 
+  it('bascule accent et slide', async () => {
+    const dispatch = vi.fn();
+    const { getByRole } = render(StepCell, {
+      index: 4,
+      step,
+      active: false,
+      held: false,
+      dispatch,
+    });
+    await fireEvent.click(getByRole('button', { name: /Accent/ }));
+    expect(dispatch).toHaveBeenLastCalledWith({
+      type: 'pattern/toggleStepFlag',
+      index: 4,
+      flag: 'accent',
+    });
+    await fireEvent.click(getByRole('button', { name: /Slide/ }));
+    expect(dispatch).toHaveBeenLastCalledWith({
+      type: 'pattern/toggleStepFlag',
+      index: 4,
+      flag: 'slide',
+    });
+  });
+
+  it('signale un pas tenu', () => {
+    const { getByRole } = render(StepCell, {
+      index: 1,
+      step,
+      active: false,
+      held: true,
+      dispatch: vi.fn(),
+    });
+    expect(getByRole('slider').closest('.cell')?.classList.contains('held')).toBe(true);
+  });
+
   it('un drag vers le haut monte la hauteur d’au moins un demi-ton', async () => {
     const dispatch = vi.fn();
-    const { getByRole } = render(StepCell, { index: 0, step, active: false, dispatch });
+    const { getByRole } = render(StepCell, {
+      index: 0,
+      step,
+      active: false,
+      held: false,
+      dispatch,
+    });
     const slider = getByRole('slider');
     await fireEvent(
       slider,
@@ -38,7 +84,13 @@ describe('StepCell', () => {
 
   it('le clavier change la hauteur par demi-ton', async () => {
     const dispatch = vi.fn();
-    const { getByRole } = render(StepCell, { index: 0, step, active: false, dispatch });
+    const { getByRole } = render(StepCell, {
+      index: 0,
+      step,
+      active: false,
+      held: false,
+      dispatch,
+    });
     await fireEvent.keyDown(getByRole('slider'), { key: 'End' });
     expect(dispatch).toHaveBeenLastCalledWith({
       type: 'pattern/setStep',

@@ -47,6 +47,23 @@ export const VCA_ATTACK_TAU_S = 0.001;
 export const VCA_RELEASE_TAU_S = 0.008;
 /** Relâchement à l'arrêt du transport, pour couper sans clic. */
 export const STOP_RELEASE_TAU_S = 0.02;
+/** Constante de temps du glissé d'un slide : 95 % du chemin en 3τ, soit 60 ms. */
+export const SLIDE_TAU_S = 0.02;
+
+/* Accent : trois effets simultanés, dosés par le knob accent. */
+/** Pic du VCA = 1 + accent × boost (1 → +6 dB). */
+export const ACCENT_MAX_GAIN_BOOST = 1;
+/** Ouverture supplémentaire du filtre, en octaves, ajoutée au pic d'enveloppe. */
+export const ACCENT_MAX_OCTAVES = 2;
+/** Résonance ajoutée par un accent au Q du knob, en dB, bornée par `RESONANCE_Q_MAX_DB`. */
+export const ACCENT_Q_BOOST_DB = 6;
+export const ACCENT_Q_ATTACK_TAU_S = 0.002;
+export const ACCENT_Q_HOLD_S = 0.01;
+/**
+ * Sur un pas accentué, la décroissance du filtre est fixée et courte quel que
+ * soit le knob decay : c'est le « claquement » caractéristique de l'accent.
+ */
+export const ACCENT_ENV_DECAY_S = 0.2;
 
 export const CUTOFF_MIN_HZ = 80;
 export const CUTOFF_MAX_HZ = 6000;

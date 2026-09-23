@@ -1,6 +1,6 @@
 # Checklists par lot
 
-<!-- forged-by: forging-review-skill · 2026-09-23 · sources : docs/PLAN.md §3 §5 §7 §8, README.md, descriptions des PR -->
+<!-- forged-by: forging-review-skill · 2026-09-23 · commit 577e06d · sources : docs/PLAN.md §3 §5 §7 §8, README.md, descriptions des PR -->
 
 Dérivé de `docs/PLAN.md` §5 (lots), §3 (arborescence cible), §7 (risques), §8 (roadmap
 v2+) et « Vérification de fin de v1 ». État au 2026-09-23. L'état des lots (livré, en

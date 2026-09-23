@@ -1,6 +1,6 @@
 # GitHub via `gh` — collecte et publication
 
-<!-- forged-by: forging-review-skill · 2026-09-23 · sources : fiche plateforme github, gh 2.x, dépôt sostennn/acid-box -->
+<!-- forged-by: forging-review-skill · 2026-09-23 · commit 577e06d · sources : fiche plateforme github, gh 2.x, dépôt sostennn/acid-box -->
 
 État au 2026-09-23 : le comportement de `gh` et de l'API GitHub fait foi.
 

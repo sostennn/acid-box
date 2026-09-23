@@ -1,6 +1,6 @@
 # Invariants d'acid-box pour la revue
 
-<!-- forged-by: forging-review-skill · 2026-09-23 · sources : README.md, docs/PLAN.md, eslint.config.js, .stylelintrc.json, tsconfig.app.json, code de main -->
+<!-- forged-by: forging-review-skill · 2026-09-23 · commit 577e06d · sources : README.md, docs/PLAN.md, eslint.config.js, .stylelintrc.json, tsconfig.app.json, code de main -->
 
 Des règles, pas une photo du code. Chaque règle cite sa source dans `README.md`,
 `docs/PLAN.md` (décisions, hypothèses H1 à H12, risques §7, décisions du lot 4) ou les

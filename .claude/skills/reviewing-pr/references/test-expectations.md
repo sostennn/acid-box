@@ -1,6 +1,6 @@
 # Attentes de tests pour la revue
 
-<!-- forged-by: forging-review-skill · 2026-09-23 · sources : docs/PLAN.md §6, vite.config.ts, tests/fakes, conventions des tests de main -->
+<!-- forged-by: forging-review-skill · 2026-09-23 · commit 577e06d · sources : docs/PLAN.md §6, vite.config.ts, tests/fakes, conventions des tests de main -->
 
 Dérivé de `docs/PLAN.md` §6, de `vite.config.ts`, des doublures de `tests/fakes` et des
 conventions observées dans les tests. État au 2026-09-23 ; le code fait foi si les tests

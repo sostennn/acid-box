@@ -1,6 +1,10 @@
 # Attentes de tests pour la revue
 
-Dérivé de `docs/PLAN.md` §6, des tests fusionnés jusqu'à la PR #3 et du worktree sur `feature/accent-slide`. État au 2026-09-23 ; le code fait foi si les tests ont bougé depuis.
+<!-- forged-by: forging-review-skill · 2026-09-23 · sources : docs/PLAN.md §6, vite.config.ts, tests/fakes, 19 fichiers de test de main à 577e06d -->
+
+Dérivé de `docs/PLAN.md` §6, de `vite.config.ts`, des doublures de `tests/fakes` et des
+117 tests de `main` à la fusion de la PR #4 (`577e06d`). État au 2026-09-23 ; le code fait
+foi si les tests ont bougé depuis.
 
 Le principe qui gouverne tout : **séparer ce qui décide de ce qui touche Web Audio**. Ce
 qui décide (quand, quelle valeur, quelle courbe) est pur et testé en node. Ce qui touche
@@ -14,19 +18,21 @@ est-elle pure, et son test décrit-il un comportement que l'on peut casser ? ».
 
 ## Ce que chaque module doit tester (§6.1, tests purs en node)
 
-| Module                                   | Attendu                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | État                                                                                                                                                                                                             |
-| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `clock/timing.ts`                        | Durée de pas pour plusieurs BPM ; offsets de shuffle uniquement sur les 16es impairs, bornés par `SHUFFLE_MAX_RATIO`, nuls à shuffle 0                                                                                                                                                                                                                                                                                                                                  | fait                                                                                                                                                                                                             |
-| `clock/scheduler.ts`                     | Avec `FakeClock` + `FakeTimer` + collecteur : chaque tick programme exactement les pas dans `[now, now + SCHEDULE_AHEAD_S[` ; aucun pas deux fois ; aucun pas manqué si le timer est en retard ; **absence de dérive sur 1000 pas** ; changement de tempo au pas suivant sans saut ; stop vide et réinitialise ; pas trop en retard sautés sans perdre la phase                                                                                                         | fait                                                                                                                                                                                                             |
-| `clock/playhead-queue.ts`                | Le pas audible est le dernier dont `time ≤ now` ; les événements passés sont purgés ; `null` avant le premier                                                                                                                                                                                                                                                                                                                                                           | fait                                                                                                                                                                                                             |
-| `model/mapping.ts`                       | Bornes (0 → min, 1 → max), monotonie, cutoff exponentiel                                                                                                                                                                                                                                                                                                                                                                                                                | fait                                                                                                                                                                                                             |
-| `model/pitch.ts`                         | Aller-retour pas ↔ index ↔ MIDI ↔ fréquence, bornes de la plage                                                                                                                                                                                                                                                                                                                                                                                                         | fait                                                                                                                                                                                                             |
-| `state.ts`                               | Chaque commande produit l'état attendu ; immuabilité (le snapshot précédent n'est pas muté) ; clamping des valeurs hors borne et de `NaN`                                                                                                                                                                                                                                                                                                                               | fait                                                                                                                                                                                                             |
-| `synth/bass/bass-plan.ts`                | Note + octave → fréquence (le tuning passe par `applyParams`, testé dans `bass-voice.test.ts`) ; silence → aucun événement ; **slide → rampe de fréquence et aucun événement d'enveloppe** ; liaison à travers un silence → le VCA reste ouvert ; accent → pics supérieurs sur VCA, cutoff et Q ; toutes les rampes exponentielles > 0 ; temps croissants au sens large par cible, `cancel` en tête de chaque cible (C3 pose `cancel`, `set` et `target` au même temps) | lot 3 fait pour note, silence, gate, enveloppe ; accent et slide en cours au lot 4 avec les quatre cas limites (chaîne de slides, slide du dernier pas vers le premier, accent + slide, tous les pas en silence) |
-| `synth/drums/drum-plan.ts` (lot 5)       | Vélocité 0 → rien ; amplitudes monotones en vélocité ; choke du hat ouvert par le hat fermé                                                                                                                                                                                                                                                                                                                                                                             | à venir                                                                                                                                                                                                          |
-| `synth/sidechain.ts` partie pure (lot 5) | Événements de ducking aux temps des kicks non mutés ; désactivé → rien ; profondeur = amount                                                                                                                                                                                                                                                                                                                                                                            | à venir                                                                                                                                                                                                          |
-| `generator/acid-generator.ts` (lot 6)    | Déterminisme à seed égale ; pas 0 = tonique ; toutes les notes dans la gamme ; densités observées dans une tolérance sur 200 tirages ; densité 0 → aucun drapeau ; densité 1 → tous ; undo restaure `previousPattern`                                                                                                                                                                                                                                                   | à venir                                                                                                                                                                                                          |
-| `persistence/serialize.ts` (lot 7)       | Aller-retour JSON ; rejet d'un payload corrompu → défauts ; champ `version`                                                                                                                                                                                                                                                                                                                                                                                             | à venir                                                                                                                                                                                                          |
+| Module                                   | Attendu                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | État                                                                                                        |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `clock/timing.ts`                        | Durée de pas pour plusieurs BPM ; offsets de shuffle uniquement sur les 16es impairs, bornés par `SHUFFLE_MAX_RATIO`, nuls à shuffle 0                                                                                                                                                                                                                                                                                                                                                                                                                                                          | fait                                                                                                        |
+| `clock/scheduler.ts`                     | Avec `FakeClock` + `FakeTimer` + collecteur : chaque tick programme exactement les pas dans `[now, now + SCHEDULE_AHEAD_S[` ; aucun pas deux fois ; aucun pas manqué si le timer est en retard ; **absence de dérive sur 1000 pas** ; changement de tempo au pas suivant sans saut ; stop vide et réinitialise ; pas trop en retard sautés sans perdre la phase                                                                                                                                                                                                                                 | fait                                                                                                        |
+| `clock/playhead-queue.ts`                | Le pas audible est le dernier dont `time ≤ now` ; les événements passés sont purgés ; `null` avant le premier                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | fait                                                                                                        |
+| `model/mapping.ts`                       | Bornes (0 → min, 1 → max), monotonie, cutoff exponentiel ; résonance linéaire en dB (milieu du knob = moyenne des bornes) ; `accentedQ` : même poussée en dB quelle que soit la résonance, jamais au-delà de `RESONANCE_Q_MAX_DB`                                                                                                                                                                                                                                                                                                                                                               | fait                                                                                                        |
+| `model/pitch.ts`                         | Aller-retour pas ↔ index ↔ MIDI ↔ fréquence, bornes de la plage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | fait                                                                                                        |
+| `state.ts`                               | Chaque commande produit l'état attendu ; immuabilité (le snapshot précédent n'est pas muté) ; clamping des valeurs hors borne et de `NaN`                                                                                                                                                                                                                                                                                                                                                                                                                                                       | fait                                                                                                        |
+| `synth/bass/bass-plan.ts`                | Note + octave → fréquence (le tuning passe par `applyParams`, testé dans `bass-voice.test.ts`) ; silence → aucun événement ; gate et enveloppe ; **pas tenu → glissé `target` de τ `SLIDE_TAU_S` au temps du pas, aucun événement d'enveloppe ni de Q** ; pas qui slide → pas de fermeture du VCA ; accent → pics supérieurs sur VCA, cutoff et Q, décroissance `ACCENT_ENV_DECAY_S` ; pas sans accent → aucun événement `filterQ` ; `timeConstant` > 0 et temps croissants au sens large par cible (`expectSane`) ; `cancel` en tête de chaque cible (C3, hors fermeture du VCA d'un pas tenu) | fait, avec les cas limites : chaîne de slides, slide vers la même note, accent sur pas tenu ignoré, silence |
+| `model/pattern.ts`                       | `holdContext` : silences sautés, bouclage 15 → 0, pattern d'un seul pas lié à lui-même, tout en silence → aucun pas précédent                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | fait                                                                                                        |
+| `model/defaults.ts`                      | La ligne de départ porte accents et slides, commence sur la tonique accentuée et boucle par un slide                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | fait                                                                                                        |
+| `synth/drums/drum-plan.ts` (lot 5)       | Vélocité 0 → rien ; amplitudes monotones en vélocité ; choke du hat ouvert par le hat fermé                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | à venir                                                                                                     |
+| `synth/sidechain.ts` partie pure (lot 5) | Événements de ducking aux temps des kicks non mutés ; désactivé → rien ; profondeur = amount                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | à venir                                                                                                     |
+| `generator/acid-generator.ts` (lot 6)    | Déterminisme à seed égale ; pas 0 = tonique ; toutes les notes dans la gamme ; densités observées dans une tolérance sur 200 tirages ; densité 0 → aucun drapeau ; densité 1 → tous ; undo restaure `previousPattern`                                                                                                                                                                                                                                                                                                                                                                           | à venir                                                                                                     |
+| `persistence/serialize.ts` (lot 7)       | Aller-retour JSON ; rejet d'un payload corrompu → défauts ; champ `version`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | à venir                                                                                                     |
 
 Un module de cette table modifié sans que son test bouge est suspect : soit le
 changement n'est pas couvert, soit il ne change rien.
@@ -35,22 +41,31 @@ changement n'est pas couvert, soit il ne change rien.
 
 ## Tests contre les fakes (§6.2, node)
 
-`tests/fakes/fake-audio-context.ts` enregistre les nœuds créés et chaque appel aux
-`AudioParam` (`setValueAtTime`, rampes, `setTargetAtTime`, `cancelScheduledValues`) et
-**lève sur une rampe exponentielle vers ≤ 0**. `tests/fakes/fake-clock.ts` fournit
-`FakeClock` (temps avancé à la main) et `FakeTimer` (`tick()` simule un réveil).
+`tests/fakes/fake-audio-context.ts` enregistre les nœuds créés par ordre de création
+(`oscillators`, `bufferSources`, `gains`, `filters`, `shapers`), leurs branchements
+(`connections`) et chaque appel aux `AudioParam` sous la forme `{ method, value, time }`
+(`setValueAtTime`, rampes, `setTargetAtTime`, `cancelScheduledValues`). Il **lève sur une
+rampe exponentielle vers ≤ 0** et sur un second `start()` d'une source. `currentTime` se
+règle à la main, `setState('interrupted')` émet `statechange`, `createFakeVisibility()`
+remplace l'API Page Visibility. `tests/fakes/fake-clock.ts` fournit `FakeClock` (temps
+avancé à la main) et `FakeTimer` (`tick()` simule un réveil).
 
 Ce qu'on vérifie avec :
 
 - `bass-voice.ts` applique le plan fidèlement sur les bons paramètres, sans programmer
   dans le passé (`safeTime`), un oscillateur persistant câblé osc → filtre → VCA → drive
   → sortie, aucune allocation de source sur cent déclenchements, `release` annule le futur
-  et referme le VCA, `dispose` arrête l'oscillateur.
+  et referme le VCA, `dispose` arrête l'oscillateur. Depuis le lot 4 : le pas qui suit un
+  slide glisse sans rouvrir le VCA ; après un stop, il rejoue la note ; un silence entre
+  les deux ne rompt pas la liaison ; un geste de résonance fait avant un accent programmé
+  l'emporte après l'accent ; un stop pendant un accent ramène Q au knob.
 - `index.ts` : `play` débloque l'audio, crée la voix, programme le premier pas ; `play`
   idempotent ; `stop` arrête le scheduler, relâche la voix, vide la tête de lecture ; les
   knobs atteignent la voix en lecture ; les niveaux du mix sont lissés, jamais écrits en
   direct ; `audibleStep` compense la latence de sortie ; `dispose` libère timer et
-  oscillateur.
+  oscillateur ; un slide fait glisser la fréquence au pas suivant, à son temps et vers sa
+  note ; un slide sur le pas 15 n'avale pas le premier pas au démarrage et lie le pas 0 du
+  deuxième tour.
 - Drums (lot 5) : un nœud par frappe, `stop` appelé, aucune référence gardée.
 - Frontière : le lint suffit, mais un test qui importe `@engine` en node pur garantit
   qu'aucune dépendance DOM ou Svelte n'a fui.
@@ -63,10 +78,12 @@ de voix ; `cancelScheduledValues` enregistre `value: NaN`, piège pour toute ass
 `every(c => c.value >= MIN_GAIN)`. Une PR qui étend le fake sur ces deux points est
 bienvenue ; une PR qui asserte des `timeConstant` sans l'étendre ne peut pas exister.
 
-Les tests localisent souvent les nœuds par ordre de création (`ctx.gains[1]`,
-`const [master, bass] = ctx.gains`) ou par un appel caractéristique : c'est acceptable,
-mais un test qui retrouve le VCA par « un appel avec `value === 1` » puis asserte « un
-appel à 1 » ne prouve rien.
+Les tests localisent les nœuds par ordre de création (`ctx.gains.at(-1)`,
+`const [master, bass] = ctx.gains`) ou par branchement : `findVca` dans `index.test.ts`
+prend le gain branché en sortie du filtre, et survit à un changement de pattern ou d'accent.
+Un test qui retrouve le VCA par « un appel avec `value === 1` » puis asserte « un appel à
+1 » ne prouve rien, et casse dès que le premier pas est accentué ; `bass-voice.test.ts` le
+fait encore (dette, `lot-checklists.md`). Un nouveau test suit le modèle `findVca`.
 
 ---
 
@@ -124,9 +141,12 @@ partir de la section du lot dans `lot-checklists.md` et de ce que la PR touche :
   (`planStep — accent`) ; `it('<comportement observable, en français>')`. Le libellé
   décrit le comportement, pas l'implémentation : « un silence ne programme rien », pas
   « appelle planStep avec rest ».
-- Un helper `setup()` par fichier construit fakes et sujet ; `flush()` pour laisser passer
-  les promesses de `play`.
-- Assertions explicites (`toEqual`, `toMatchObject`, `toBeGreaterThan`), pas de snapshot.
+- Un helper `setup()` dans les fichiers qui construisent fakes et sujet (`index`,
+  `bass-voice`, `context`, `scheduler`), `renderKnob()` et `pointer()` pour `Knob` ;
+  `flush()` pour laisser passer les promesses de `play` ; aucun `beforeEach`.
+- Assertions explicites, `toBe` largement en tête, puis `toEqual`, `toBeCloseTo` et
+  `toMatchObject`, `expect.objectContaining` dans `toContainEqual` ; aucun snapshot, aucun
+  `vi.mock`, `vi.fn()` seulement pour les callbacks.
 - Les tests importent les constantes nommées (`GATE_RATIO`, `MIN_GAIN`,
   `START_DELAY_S`) plutôt que de recopier leur valeur : un test qui écrit `0.55` en dur
   cassera au premier réglage.
@@ -142,8 +162,9 @@ partir de la section du lot dans `lot-checklists.md` et de ce que la PR touche :
 - Assertion non discriminante : oracle égal à la valeur par défaut (un moteur qui jouerait
   toujours C2 passerait), `toMatchObject` sur méthode et valeur sans le temps quand un
   autre événement a la même méthode et la même valeur (la fermeture de gate et le
-  `release` posent tous deux `MIN_GAIN`), branche `if` d'un test jamais exécutée (aucun
-  `expRamp` produit au lot 3 : préférer `expect(ramps).toEqual([])`).
+  `release` posent tous deux `MIN_GAIN`), branche `if` d'un test jamais exécutée (un
+  contrôle sur un type d'événement que le plan ne produit pas : préférer
+  `expect(events).toEqual([])` sur la cible).
 - Test de `bass-voice` qui asserte des compteurs d'appels sans vérifier valeur et temps.
 - Chaîne de nœuds vérifiée seulement aux extrémités : un maillon débranché passe.
 - `.only`, `.skip`, `.todo` : jamais fusionnés.
@@ -151,7 +172,11 @@ partir de la section du lot dans `lot-checklists.md` et de ce que la PR touche :
   `FakeTimer.tick()` existe pour ça.
 - Nombre de tests annoncé dans la PR qui ne correspond pas au décompte : en mode local,
   la sortie de `pnpm test` ; en mode PR, les `it(` à la version revue
-  (`references/github.md`). À signaler en Nit, c'est la description qui est fausse.
+  (`references/github.md`, avec `[[:space:]]` et non `\s`, que le `git grep` de macOS ne
+  connaît pas). À signaler en Nit, c'est la description qui est fausse.
+- Test de voix qui asserte un `timeConstant` : le fake ne l'enregistre pas, l'assertion
+  échoue ou ne teste rien ; vérifier plutôt `method`, `value` et `time`, et le
+  `timeConstant` dans le test du plan.
 - Littéraux recopiés dans un test à la place d'une constante exportée (`36` pour
   `BASE_OCTAVE_MIDI`, `1200` pour `TUNING_RANGE_SEMITONES * 100`) : cassera au premier
   réglage.

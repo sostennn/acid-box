@@ -17,6 +17,8 @@ allowed-tools: Bash(gh:*) Bash(git:*) Bash(pnpm:*) Bash(jq:*) Bash(mktemp:*) Bas
 
 # Revue de PR — acid-box
 
+<!-- forged-by: forging-review-skill · 2026-09-23 · sources : README.md, docs/PLAN.md, configs d'outillage, code de main à 577e06d, PR #1 à #5 -->
+
 Ce dépôt a un contrat écrit inhabituellement précis : cinq principes d'architecture dans le
 README, douze hypothèses tranchées, un découpage en lots, une stratégie de tests module par
 module et une table de risques Web Audio avec leurs parades dans `docs/PLAN.md`. Une bonne
@@ -59,13 +61,13 @@ Argument : `$ARGUMENTS`.
 
 Si la CI est verte, ces points sont acquis. Ne pas les revérifier, ne pas les commenter.
 
-| Garanti par                                                                                                            | Ce que ça couvre                                                                                                                                                                       |
-| ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm typecheck` (svelte-check + tsc, `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnused*`) | Types, exhaustivité du `switch` du reducer, index de tableau possiblement `undefined`                                                                                                  |
-| ESLint                                                                                                                 | Frontière `src/engine` → aucun import de `svelte` ni de `src/ui` ; `setTimeout`/`setInterval` interdits dans le moteur hors `timer.worker.ts` et tests                                 |
-| Stylelint, sur `src/**/*.{css,svelte}`                                                                                 | Couleurs, rayons, `font-size`, `font-family`, espacements et `box-shadow` littéraux interdits hors `src/ui/theme/tokens.css` ; pas les attributs `style=` inline ni le CSS hors `src/` |
-| Prettier                                                                                                               | Formatage, README et docs compris                                                                                                                                                      |
-| Vitest + `tests/fakes`                                                                                                 | Ce que les tests couvrent ; `FakeAudioParam` lève sur une rampe exponentielle vers ≤ 0                                                                                                 |
+| Garanti par                                                                                                            | Ce que ça couvre                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm typecheck` (svelte-check + tsc, `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnused*`) | Types, index de tableau possiblement `undefined` ; exhaustivité du `switch` du reducer tant qu'il n'a pas de `default`                                                                                                                                                                                        |
+| ESLint                                                                                                                 | Frontière `src/engine` → aucun import de `svelte` ni de `src/ui` ; `setTimeout`/`setInterval` nus interdits dans le moteur hors `timer.worker.ts` et tests. Pas `window.setTimeout` et variantes (B1), ni les imports profonds `@engine/*` depuis l'UI (A4), ni les promesses non attendues (lint sans types) |
+| Stylelint, sur `src/**/*.{css,svelte}`                                                                                 | Couleurs, rayons, `font-size`, `font-family`, espacements et `box-shadow` littéraux interdits hors `src/ui/theme/tokens.css` ; pas `width`, `height`, `line-height`, les durées de `transition`, les attributs `style=` inline ni le CSS hors `src/` (E4)                                                     |
+| Prettier                                                                                                               | Formatage, README et docs compris                                                                                                                                                                                                                                                                             |
+| Vitest + `tests/fakes`                                                                                                 | Ce que les tests couvrent, tant que la PR ne les affaiblit pas (F2) ; `FakeAudioParam` lève sur une rampe exponentielle vers ≤ 0, une source lève sur un second `start()`                                                                                                                                     |
 
 Le travail du reviewer commence là où ce tableau s'arrête : `references/invariants.md`
 liste précisément ce qui n'est pas couvert, et sa section C0 rappelle les unités et
@@ -141,15 +143,15 @@ plusieurs passes par domaine.
 4. Cartographier les fichiers touchés vers les domaines. La dernière colonne liste le
    contexte hors diff à relire pour vérifier les invariants du domaine :
 
-| Domaine   | Fichiers                                                                                                     | Invariants                        | Contexte hors diff                                                                                                            |
-| --------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| frontière | `src/engine/index.ts`, `src/ui/state/engine.svelte.ts`, tout import croisé                                   | section A                         | `src/engine/index.ts` (ré-exports)                                                                                            |
-| horloge   | `src/engine/clock/**`, câblage du scheduler dans `index.ts`, `src/ui/playhead/**`                            | section B                         | `clock/timing.ts`, `clock/scheduler.ts`, `model/constants.ts`                                                                 |
-| synthèse  | `src/engine/synth/**`, `src/engine/audio/**`                                                                 | section C                         | `audio/params.ts`, `model/constants.ts`, `model/mapping.ts`, `synth/graph.ts`                                                 |
-| modèle    | `src/engine/model/**`, `state.ts`, `commands.ts`                                                             | section D                         | `model/defaults.ts`, `model/types.ts`, `state.ts`                                                                             |
-| interface | `src/ui/**`                                                                                                  | section E                         | `gestures/knob-math.ts`, `gestures/knob-drag.ts`, `components/Knob.svelte`, `components/Transport.svelte`, `theme/tokens.css` |
-| tests     | `**/*.test.ts`, `tests/**`                                                                                   | `references/test-expectations.md` | `tests/fakes/*`, tests voisins non touchés des modules modifiés                                                               |
-| livraison | `.github/**`, `package.json`, `pnpm-lock.yaml`, `vite.config.ts`, configs lint et TS, `README.md`, `docs/**` | section G                         | `README.md` « Feuille de route » et « À écouter »                                                                             |
+| Domaine   | Fichiers                                                                                                     | Invariants                        | Contexte hors diff                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| frontière | `src/engine/index.ts`, `src/ui/state/engine.svelte.ts`, tout import croisé                                   | section A                         | `src/engine/index.ts` (ré-exports)                                                                                             |
+| horloge   | `src/engine/clock/**`, câblage du scheduler dans `index.ts`, `src/ui/playhead/**`                            | section B                         | `clock/timing.ts`, `clock/scheduler.ts`, `model/constants.ts`                                                                  |
+| synthèse  | `src/engine/synth/**`, `src/engine/audio/**`                                                                 | section C                         | `audio/params.ts`, `model/constants.ts`, `model/mapping.ts`, `synth/graph.ts`, état de la voix dans `synth/bass/bass-voice.ts` |
+| modèle    | `src/engine/model/**`, `state.ts`, `commands.ts`                                                             | section D                         | `model/defaults.ts`, `model/types.ts`, `model/pattern.ts`, `state.ts`                                                          |
+| interface | `src/ui/**`                                                                                                  | section E                         | `gestures/knob-math.ts`, `gestures/knob-drag.ts`, `components/Knob.svelte`, `components/Transport.svelte`, `theme/tokens.css`  |
+| tests     | `**/*.test.ts`, `tests/**`                                                                                   | `references/test-expectations.md` | `tests/fakes/*`, tests voisins non touchés des modules modifiés                                                                |
+| livraison | `.github/**`, `package.json`, `pnpm-lock.yaml`, `vite.config.ts`, configs lint et TS, `README.md`, `docs/**` | section G                         | `README.md` « Feuille de route » et « À écouter »                                                                              |
 
 Un finding appartient au domaine du **fichier** où il se trouve : une constante du
 moteur recopiée dans un composant est un finding du domaine interface, sourcé D2.
@@ -262,7 +264,8 @@ finding candidat :
 2. Chercher si l'invariant est déjà assuré ailleurs. Exemples réels : `safeTime` dans
    `bass-voice.apply` couvre tous les événements d'un plan, donc `bass-plan.ts` n'a pas
    à borner ses temps ; `clamp` dans le reducer couvre les valeurs venues de l'interface ;
-   `smoothSet` dans `applyMix` couvre les gains du mix.
+   `smoothSet` dans `applyMix` couvre les gains du mix ; `noteOpen` dans la voix décide la
+   liaison, donc `bass-plan.ts` n'a pas à lire le pattern.
 3. Confirmer que la ligne pointée existe côté nouveau fichier et fait partie du diff.
    Sinon, choisir la ligne du diff la plus proche ou basculer en commentaire global.
 4. Fixer la sévérité :
@@ -383,6 +386,8 @@ Terminer par l'URL de la review et le nombre de commentaires postés.
   ou un champ `length` sur le pattern : ces choix sont tranchés dans le plan.
 - Oublier que la valeur d'un knob dans l'état est normalisée 0..1 et croire à un bug
   d'unité.
+- Exiger une ancre `set` devant le glissé du slide, ou une tenue lue dans le pattern : le
+  glissé est un `setTargetAtTime` et la liaison vient de la voix (C2, C11).
 - Lancer les sous-agents en arrière-plan, ou lire le diff complet avant de le leur
   redistribuer.
 - Approuver seul, ou tenter `APPROVE` sur sa propre PR.

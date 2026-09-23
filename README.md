@@ -69,4 +69,4 @@ patterns et enregistrement (v3), export WAV, partage par URL et Web MIDI (v4).
 
 - Pas de clic à l'arrêt ni au changement de forme d'onde.
 - Pas de bruit de « zipper » quand on tourne un knob.
-- Le curseur visuel tombe sur le pas que l'on entend, à 60 comme à 160 BPM.
+- Le curseur visuel tombe sur le pas que l'on entend, à 60 comme à 240 BPM.

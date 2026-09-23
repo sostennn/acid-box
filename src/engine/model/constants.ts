@@ -60,10 +60,10 @@ export const ACCENT_Q_BOOST_DB = 6;
 export const ACCENT_Q_ATTACK_TAU_S = 0.002;
 export const ACCENT_Q_HOLD_S = 0.01;
 /**
- * Sur un pas accentué, la décroissance du filtre est fixée et courte quel que
- * soit le knob decay : c'est le « claquement » caractéristique de l'accent.
+ * Sur un pas accentué, la décroissance du filtre est fixée au plus court quel
+ * que soit le knob decay, comme sur la 303 : c'est le « claquement » de l'accent.
  */
-export const ACCENT_ENV_DECAY_S = 0.2;
+export const ACCENT_ENV_DECAY_S = 0.05;
 
 export const CUTOFF_MIN_HZ = 80;
 export const CUTOFF_MAX_HZ = 6000;
@@ -71,8 +71,13 @@ export const CUTOFF_MAX_HZ = 6000;
 export const RESONANCE_Q_MIN_DB = -3;
 /** Un biquad devient instable au-delà ; le filtre en échelle (v2) ira plus loin. */
 export const RESONANCE_Q_MAX_DB = 18;
-export const DECAY_MIN_S = 0.03;
-export const DECAY_MAX_S = 2;
+/**
+ * Plage du knob decay (constante de temps). Un pas dure 66 ms à 125 BPM avant
+ * sa fermeture : au-delà de ~0,6 s, le filtre n'a plus le temps de se refermer
+ * de façon audible, seuls les slides en profiteraient.
+ */
+export const DECAY_MIN_S = 0.02;
+export const DECAY_MAX_S = 0.6;
 /** Ouverture maximale du filtre par l'enveloppe, en octaves au-dessus du cutoff. */
 export const ENV_MOD_MAX_OCTAVES = 5;
 export const TUNING_RANGE_SEMITONES = 12;

@@ -19,6 +19,10 @@ function setup() {
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+/** Le VCA est le gain branché en sortie du filtre de la voix basse. */
+const findVca = (ctx: FakeAudioContext) =>
+  ctx.gains.find((gain) => ctx.filters[0]?.connections.includes(gain));
+
 describe('createEngine', () => {
   it('expose l’état audio et notifie les abonnés', async () => {
     const { engine } = setup();
@@ -99,7 +103,7 @@ describe('createEngine', () => {
     expect(engine.getState().transport.status).toBe('stopped');
     expect(timer.running).toBe(false);
     expect(engine.audibleStep()).toBeNull();
-    const vca = ctx.gains.find((g) => g.gain.calls.some((c) => c.value === 1));
+    const vca = findVca(ctx);
     expect(vca?.gain.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime', value: MIN_GAIN });
     expect(ctx.oscillators[0]?.stoppedAt).toBeNull();
   });
@@ -145,11 +149,12 @@ describe('createEngine', () => {
 
   it('un slide sur le pas 15 n’avale pas le premier pas au démarrage', async () => {
     const { engine, ctx, timer } = setup();
+    engine.dispatch({ type: 'pattern/setStep', index: 0, patch: { accent: false } });
     engine.dispatch({ type: 'pattern/setStep', index: 15, patch: { slide: true, rest: false } });
     engine.dispatch({ type: 'transport/play' });
     await flush();
 
-    const vca = ctx.gains.find((g) => g.gain.calls.some((c) => c.value === 1));
+    const vca = findVca(ctx);
     expect(vca?.gain.calls[1]).toMatchObject({ method: 'setTargetAtTime', value: 1 });
     expect(vca?.gain.calls[1]?.time).toBeCloseTo(START_DELAY_S, 10);
 

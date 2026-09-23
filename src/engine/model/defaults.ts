@@ -28,31 +28,41 @@ export const DEFAULT_DRUM_PATTERN: DrumPattern = {
   openHat: tuple16(() => 0),
 };
 
-/** Une ligne en Do mineur pour que le premier play sonne déjà acid. */
-const DEFAULT_BASS_LINE: readonly (readonly [PitchClass, OctaveOffset] | null)[] = [
-  [0, 0],
+interface LineStep {
+  readonly note: PitchClass;
+  readonly octave?: OctaveOffset;
+  readonly accent?: true;
+  readonly slide?: true;
+}
+
+/**
+ * Une ligne acid classique en Do mineur : une tonique qui saute d'octave,
+ * accents et slides pour le phrasé. Le slide du dernier pas relie la boucle.
+ */
+const DEFAULT_BASS_LINE: readonly (LineStep | null)[] = [
+  { note: 0, accent: true },
+  { note: 0, octave: 1, slide: true },
+  { note: 0 },
   null,
-  [0, 0],
-  [3, 0],
-  [0, 0],
+  { note: 3, accent: true, slide: true },
+  { note: 5 },
+  { note: 0 },
+  { note: 0, octave: 1, accent: true },
   null,
-  [7, -1],
-  [0, 0],
+  { note: 10, octave: -1, slide: true },
+  { note: 0 },
+  { note: 0, accent: true },
+  { note: 7, slide: true },
   null,
-  [0, 0],
-  [10, -1],
-  [0, 0],
-  [3, 0],
-  null,
-  [0, 1],
-  [7, 0],
+  { note: 0, octave: 1, accent: true },
+  { note: 3, slide: true },
 ];
 
 export const DEFAULT_PATTERN: Pattern = {
   bass: tuple16((index) => {
     const entry = DEFAULT_BASS_LINE[index];
     if (entry === null || entry === undefined) return { ...DEFAULT_STEP, rest: true };
-    return { ...DEFAULT_STEP, note: entry[0], octave: entry[1] };
+    return { ...DEFAULT_STEP, ...entry };
   }),
   drums: DEFAULT_DRUM_PATTERN,
 };
@@ -67,12 +77,12 @@ export const DEFAULT_TRANSPORT: TransportState = {
 export const DEFAULT_BASS: BassParams = {
   waveform: 'sawtooth',
   tuning: 0.5,
-  cutoff: 0.4,
-  resonance: 0.6,
-  envMod: 0.5,
-  decay: 0.4,
-  accent: 0.6,
-  drive: 0.2,
+  cutoff: 0.25,
+  resonance: 0.75,
+  envMod: 0.65,
+  decay: 0.35,
+  accent: 0.8,
+  drive: 0.35,
 };
 
 export const DEFAULT_DRUMS: DrumParams = {

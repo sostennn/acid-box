@@ -5,15 +5,18 @@
  */
 import type { AudioContextLike } from '../../audio/context';
 import { safeTime, smoothSet } from '../../audio/params';
-import { MIN_GAIN, STOP_RELEASE_TAU_S } from '../../model/constants';
+import { KNOB_SMOOTHING_S, MIN_GAIN, STOP_RELEASE_TAU_S } from '../../model/constants';
 import { cutoffToHz, resonanceToQ, tuningToCents } from '../../model/mapping';
-import type { BassParams, Step } from '../../model/types';
+import type { BassParams } from '../../model/types';
 import type { FilterStage } from '../filter-stage';
-import { planStep, type ParamEvent, type ParamTarget } from './bass-plan';
+import { planStep, type ParamEvent, type ParamTarget, type StepPlanInput } from './bass-plan';
 import { createDrive } from './drive';
 
+/** Un pas à jouer ; la voix sait elle-même si une note sonne encore. */
+export type StepTrigger = Omit<StepPlanInput, 'held'>;
+
 export interface BassVoice {
-  trigger(step: Step, time: number, stepDuration: number, params: BassParams): void;
+  trigger(input: StepTrigger): void;
   /** Knobs : écriture lissée, indépendante des événements programmés. */
   applyParams(params: BassParams): void;
   /** Coupe la note en cours sans clic et annule tout ce qui était programmé après `time`. */
@@ -40,6 +43,7 @@ export function createBassVoice(
   const params: Record<ParamTarget, AudioParam> = {
     frequency: oscillator.frequency,
     filterDetune: filter.detune,
+    filterQ: filter.q,
     vca: vca.gain,
   };
 
@@ -53,38 +57,62 @@ export function createBassVoice(
       case 'set':
         param.setValueAtTime(event.value, time);
         return;
-      case 'expRamp':
-        param.exponentialRampToValueAtTime(event.value, time);
-        return;
       case 'target':
         param.setTargetAtTime(event.value, time, event.timeConstant);
         return;
     }
   };
 
+  // Le plan fige la résonance du knob dans le retour de Q d'un accent. Un geste
+  // fait entre la programmation de l'accent et ce retour doit l'emporter : la
+  // voix garde la valeur du knob et reprogramme le retour avec elle.
+  let knobQ = resonanceToQ(initial.resonance);
+  let pendingQReturn: { readonly time: number; readonly timeConstant: number } | null = null;
+
   const applyParams = (next: BassParams) => {
     oscillator.type = next.waveform;
     smoothSet(oscillator.detune, tuningToCents(next.tuning), ctx);
     smoothSet(filter.frequency, cutoffToHz(next.cutoff), ctx);
-    smoothSet(filter.q, resonanceToQ(next.resonance), ctx);
+    knobQ = resonanceToQ(next.resonance);
+    smoothSet(filter.q, knobQ, ctx);
+    if (pendingQReturn !== null && pendingQReturn.time > ctx.currentTime) {
+      filter.q.setTargetAtTime(knobQ, pendingQReturn.time, pendingQReturn.timeConstant);
+    }
     drive.setAmount(next.drive);
   };
 
   oscillator.type = initial.waveform;
   oscillator.detune.value = tuningToCents(initial.tuning);
   filter.frequency.value = cutoffToHz(initial.cutoff);
-  filter.q.value = resonanceToQ(initial.resonance);
+  filter.q.value = knobQ;
   oscillator.start();
 
+  // Déduit de ce qui a été joué, pas du pattern : au premier play, après un
+  // stop ou après une édition, aucune note ne sonne même si le pattern en lie une.
+  let noteOpen = false;
+
   return {
-    trigger(step, time, stepDuration, current) {
-      planStep({ step, params: current, time, stepDuration }).forEach(apply);
+    trigger(input) {
+      const events = planStep({ ...input, held: noteOpen });
+      events.forEach(apply);
+      if (!input.step.rest) noteOpen = input.step.slide;
+      const qReturn = events.findLast((event) => event.target === 'filterQ');
+      if (qReturn?.kind === 'target') {
+        pendingQReturn = {
+          time: safeTime(ctx, qReturn.time),
+          timeConstant: qReturn.timeConstant,
+        };
+      }
     },
     applyParams,
     release(time) {
       const at = safeTime(ctx, time);
       (Object.values(params) as AudioParam[]).forEach((param) => param.cancelScheduledValues(at));
       vca.gain.setTargetAtTime(MIN_GAIN, at, STOP_RELEASE_TAU_S);
+      // Le cancel a pu effacer le retour d'un accent en cours : Q revient au knob.
+      filter.q.setTargetAtTime(knobQ, at, KNOB_SMOOTHING_S);
+      pendingQReturn = null;
+      noteOpen = false;
     },
     dispose() {
       oscillator.stop();

@@ -29,7 +29,9 @@ export type { AudioAvailability, AudioInfo } from './audio/context';
 export type { Command, StepFlag } from './commands';
 export type * from './model/types';
 export { BPM_MAX, BPM_MIN, STEP_COUNT, TUNING_RANGE_SEMITONES } from './model/constants';
+export { DEFAULT_BASS } from './model/defaults';
 export { cutoffToHz, decayToSeconds, resonanceToQ, tuningToCents } from './model/mapping';
+export { holdContext } from './model/pattern';
 export { PITCH_RANGE_SEMITONES, indexToPitch, pitchLabel, pitchToIndex } from './model/pitch';
 
 export interface EngineOptions {
@@ -86,12 +88,12 @@ export function createEngine(options: EngineOptions = {}): Engine {
       onStep: (index, time) => {
         // Le pattern et les knobs sont lus au moment de programmer : une
         // édition prend effet au plus tard une fenêtre de lookahead plus tard.
-        bass.trigger(
-          state.pattern.bass[index],
+        bass.trigger({
+          step: state.pattern.bass[index],
+          params: state.bass,
           time,
-          stepDurationSeconds(state.transport.bpm),
-          state.bass,
-        );
+          stepDuration: stepDurationSeconds(state.transport.bpm),
+        });
         playhead.push({ step: index, time });
       },
     });

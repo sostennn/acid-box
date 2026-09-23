@@ -14,10 +14,12 @@
     index: StepIndex;
     step: Step;
     active: boolean;
+    /** Le pas hérite de la note en cours (le pas joué précédent porte un slide). */
+    held: boolean;
     dispatch: (command: Command) => void;
   }
 
-  const { index, step, active, dispatch }: Props = $props();
+  const { index, step, active, held, dispatch }: Props = $props();
 
   const maxIndex = PITCH_RANGE_SEMITONES - 1;
   /** C2, milieu de la plage : cible du double-tap. */
@@ -31,7 +33,7 @@
   }
 </script>
 
-<div class="cell" class:active class:rest={step.rest}>
+<div class="cell" class:active class:rest={step.rest} class:held={held && !step.rest}>
   <div
     class="pitch"
     role="slider"
@@ -49,14 +51,36 @@
   >
     {label}
   </div>
-  <button
-    type="button"
-    class="flag"
-    class:on={!step.rest}
-    aria-pressed={!step.rest}
-    aria-label={`Pas ${index + 1} ${step.rest ? 'silencieux' : 'joué'}`}
-    onclick={() => dispatch({ type: 'pattern/toggleStepFlag', index, flag: 'rest' })}
-  ></button>
+  <div class="flags">
+    <button
+      type="button"
+      class="flag gate"
+      class:on={!step.rest}
+      aria-pressed={!step.rest}
+      aria-label={`Pas ${index + 1} ${step.rest ? 'silencieux' : 'joué'}`}
+      onclick={() => dispatch({ type: 'pattern/toggleStepFlag', index, flag: 'rest' })}
+    ></button>
+    <button
+      type="button"
+      class="flag"
+      class:on={step.accent}
+      aria-pressed={step.accent}
+      aria-label={`Accent du pas ${index + 1}`}
+      onclick={() => dispatch({ type: 'pattern/toggleStepFlag', index, flag: 'accent' })}
+    >
+      A
+    </button>
+    <button
+      type="button"
+      class="flag"
+      class:on={step.slide}
+      aria-pressed={step.slide}
+      aria-label={`Slide du pas ${index + 1}`}
+      onclick={() => dispatch({ type: 'pattern/toggleStepFlag', index, flag: 'slide' })}
+    >
+      S
+    </button>
+  </div>
 </div>
 
 <style>
@@ -79,6 +103,14 @@
     color: var(--color-text-muted);
   }
 
+  .cell.held .pitch {
+    color: var(--step-held-color);
+  }
+
+  .cell.held .pitch::before {
+    content: '~';
+  }
+
   .pitch {
     min-height: var(--control-size);
     display: grid;
@@ -96,12 +128,30 @@
     box-shadow: var(--focus-ring);
   }
 
+  .flags {
+    display: flex;
+    flex-direction: column;
+    gap: var(--step-gap);
+  }
+
   .flag {
-    height: var(--space-3);
+    min-height: var(--space-5);
+    padding: 0;
     border: none;
     border-radius: var(--radius-sm);
     background: var(--step-flag-off);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    line-height: 1;
     cursor: pointer;
+  }
+
+  .flag.gate {
+    min-height: var(--space-3);
+  }
+
+  .flag.on {
+    color: var(--color-accent-contrast);
   }
 
   .flag.on {

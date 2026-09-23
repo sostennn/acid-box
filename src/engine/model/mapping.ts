@@ -3,6 +3,7 @@
  * Chaque courbe est nommée pour que son intention soit lisible.
  */
 import {
+  ACCENT_Q_BOOST_DB,
   CUTOFF_MAX_HZ,
   CUTOFF_MIN_HZ,
   DECAY_MAX_S,
@@ -10,8 +11,8 @@ import {
   DRIVE_MAKEUP_EXPONENT,
   DRIVE_MAX_GAIN,
   ENV_MOD_MAX_OCTAVES,
-  RESONANCE_Q_MAX,
-  RESONANCE_Q_MIN,
+  RESONANCE_Q_MAX_DB,
+  RESONANCE_Q_MIN_DB,
   TUNING_RANGE_SEMITONES,
 } from './constants';
 import type { Normalized } from './types';
@@ -33,8 +34,17 @@ export function cutoffToHz(cutoff: Normalized): number {
   return expMap(cutoff, CUTOFF_MIN_HZ, CUTOFF_MAX_HZ);
 }
 
+/**
+ * Q du passe-bas, en dB. Le dB étant déjà logarithmique, la courbe est
+ * linéaire : chaque portion du knob ajoute autant de résonance.
+ */
 export function resonanceToQ(resonance: Normalized): number {
-  return expMap(resonance, RESONANCE_Q_MIN, RESONANCE_Q_MAX);
+  return RESONANCE_Q_MIN_DB + resonance * (RESONANCE_Q_MAX_DB - RESONANCE_Q_MIN_DB);
+}
+
+/** Q d'un pas accentué : poussée fixe en dB, jamais au-delà de la borne du biquad. */
+export function accentedQ(resonance: Normalized, accent: Normalized): number {
+  return Math.min(RESONANCE_Q_MAX_DB, resonanceToQ(resonance) + accent * ACCENT_Q_BOOST_DB);
 }
 
 /** Constante de temps de la décroissance du filtre. */

@@ -47,14 +47,37 @@ export const VCA_ATTACK_TAU_S = 0.001;
 export const VCA_RELEASE_TAU_S = 0.008;
 /** Relâchement à l'arrêt du transport, pour couper sans clic. */
 export const STOP_RELEASE_TAU_S = 0.02;
+/** Constante de temps du glissé d'un slide : 95 % du chemin en 3τ, soit 60 ms. */
+export const SLIDE_TAU_S = 0.02;
+
+/* Accent : trois effets simultanés, dosés par le knob accent. */
+/** Pic du VCA = 1 + accent × boost (1 → +6 dB). */
+export const ACCENT_MAX_GAIN_BOOST = 1;
+/** Ouverture supplémentaire du filtre, en octaves, ajoutée au pic d'enveloppe. */
+export const ACCENT_MAX_OCTAVES = 2;
+/** Résonance ajoutée par un accent au Q du knob, en dB, bornée par `RESONANCE_Q_MAX_DB`. */
+export const ACCENT_Q_BOOST_DB = 6;
+export const ACCENT_Q_ATTACK_TAU_S = 0.002;
+export const ACCENT_Q_HOLD_S = 0.01;
+/**
+ * Sur un pas accentué, la décroissance du filtre est fixée au plus court quel
+ * que soit le knob decay, comme sur la 303 : c'est le « claquement » de l'accent.
+ */
+export const ACCENT_ENV_DECAY_S = 0.05;
 
 export const CUTOFF_MIN_HZ = 80;
 export const CUTOFF_MAX_HZ = 6000;
-export const RESONANCE_Q_MIN = 0.7;
+/** Q d'un passe-bas en dB : −3 dB est la réponse Butterworth, sans bosse à la coupure. */
+export const RESONANCE_Q_MIN_DB = -3;
 /** Un biquad devient instable au-delà ; le filtre en échelle (v2) ira plus loin. */
-export const RESONANCE_Q_MAX = 18;
-export const DECAY_MIN_S = 0.03;
-export const DECAY_MAX_S = 2;
+export const RESONANCE_Q_MAX_DB = 18;
+/**
+ * Plage du knob decay (constante de temps). Un pas dure 66 ms à 125 BPM avant
+ * sa fermeture : au-delà de ~0,6 s, le filtre n'a plus le temps de se refermer
+ * de façon audible, seuls les slides en profiteraient.
+ */
+export const DECAY_MIN_S = 0.02;
+export const DECAY_MAX_S = 0.6;
 /** Ouverture maximale du filtre par l'enveloppe, en octaves au-dessus du cutoff. */
 export const ENV_MOD_MAX_OCTAVES = 5;
 export const TUNING_RANGE_SEMITONES = 12;

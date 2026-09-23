@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext, createFakeVisibility } from '../../tests/fakes/fake-audio-context';
 import { FakeTimer } from '../../tests/fakes/fake-clock';
 import { createEngine } from './index';
-import { MIN_GAIN, START_DELAY_S } from './model/constants';
+import { BPM_DEFAULT, MIN_GAIN, START_DELAY_S } from './model/constants';
 import { midiToFrequency, pitchToMidi } from './model/pitch';
+import { stepDurationSeconds } from './clock/timing';
 
 function setup() {
   const ctx = new FakeAudioContext();
@@ -17,6 +18,10 @@ function setup() {
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** Le VCA est le gain branché en sortie du filtre de la voix basse. */
+const findVca = (ctx: FakeAudioContext) =>
+  ctx.gains.find((gain) => ctx.filters[0]?.connections.includes(gain));
 
 describe('createEngine', () => {
   it('expose l’état audio et notifie les abonnés', async () => {
@@ -98,7 +103,7 @@ describe('createEngine', () => {
     expect(engine.getState().transport.status).toBe('stopped');
     expect(timer.running).toBe(false);
     expect(engine.audibleStep()).toBeNull();
-    const vca = ctx.gains.find((g) => g.gain.calls.some((c) => c.value === 1));
+    const vca = findVca(ctx);
     expect(vca?.gain.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime', value: MIN_GAIN });
     expect(ctx.oscillators[0]?.stoppedAt).toBeNull();
   });
@@ -121,6 +126,49 @@ describe('createEngine', () => {
     const [master, bass] = ctx.gains;
     expect(master?.gain.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime', value: 0.25 });
     expect(bass?.gain.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime', value: 1 });
+  });
+
+  it('un slide dans le pattern fait glisser la fréquence au pas suivant', async () => {
+    const { engine, ctx, timer } = setup();
+    engine.dispatch({ type: 'pattern/setStep', index: 0, patch: { slide: true, rest: false } });
+    engine.dispatch({ type: 'pattern/setStep', index: 1, patch: { rest: false, note: 7 } });
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+    ctx.currentTime = 0.1;
+    timer.tick();
+    const step1 = engine.getState().pattern.bass[1];
+    const calls = ctx.oscillators[0]?.frequency.calls ?? [];
+    expect(calls).toContainEqual(
+      expect.objectContaining({
+        method: 'setTargetAtTime',
+        time: START_DELAY_S + stepDurationSeconds(BPM_DEFAULT),
+        value: step1 ? midiToFrequency(pitchToMidi(step1)) : NaN,
+      }),
+    );
+  });
+
+  it('un slide sur le pas 15 n’avale pas le premier pas au démarrage', async () => {
+    const { engine, ctx, timer } = setup();
+    engine.dispatch({ type: 'pattern/setStep', index: 0, patch: { accent: false } });
+    engine.dispatch({ type: 'pattern/setStep', index: 15, patch: { slide: true, rest: false } });
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+
+    const vca = findVca(ctx);
+    expect(vca?.gain.calls[1]).toMatchObject({ method: 'setTargetAtTime', value: 1 });
+    expect(vca?.gain.calls[1]?.time).toBeCloseTo(START_DELAY_S, 10);
+
+    // Au deuxième tour, le pas 0 hérite bien de la note tenue par le pas 15.
+    const loop = START_DELAY_S + 16 * stepDurationSeconds(BPM_DEFAULT);
+    ctx.currentTime = loop - 0.05;
+    timer.tick();
+    const frequencyAtLoop = ctx.oscillators[0]?.frequency.calls.filter(
+      (c) => Math.abs(c.time - loop) < 1e-9,
+    );
+    expect(frequencyAtLoop?.map((c) => c.method)).toEqual([
+      'cancelScheduledValues',
+      'setTargetAtTime',
+    ]);
   });
 
   it('play est idempotent', async () => {

@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    DEFAULT_BASS,
     cutoffToHz,
     decayToSeconds,
     resonanceToQ,
@@ -54,7 +55,7 @@
     <Knob
       label="Tuning"
       value={bass.tuning}
-      defaultValue={0.5}
+      defaultValue={DEFAULT_BASS.tuning}
       bipolar
       format={semitones}
       onchange={set('tuning')}
@@ -62,42 +63,42 @@
     <Knob
       label="Cutoff"
       value={bass.cutoff}
-      defaultValue={0.4}
+      defaultValue={DEFAULT_BASS.cutoff}
       format={hertz}
       onchange={set('cutoff')}
     />
     <Knob
       label="Reso"
       value={bass.resonance}
-      defaultValue={0.6}
-      format={(v) => `Q ${resonanceToQ(v).toFixed(1)}`}
+      defaultValue={DEFAULT_BASS.resonance}
+      format={(v) => `${resonanceToQ(v).toFixed(1)} dB`}
       onchange={set('resonance')}
     />
     <Knob
       label="Env mod"
       value={bass.envMod}
-      defaultValue={0.5}
+      defaultValue={DEFAULT_BASS.envMod}
       format={percent}
       onchange={set('envMod')}
     />
     <Knob
       label="Decay"
       value={bass.decay}
-      defaultValue={0.4}
+      defaultValue={DEFAULT_BASS.decay}
       format={seconds}
       onchange={set('decay')}
     />
     <Knob
       label="Accent"
       value={bass.accent}
-      defaultValue={0.6}
+      defaultValue={DEFAULT_BASS.accent}
       format={percent}
       onchange={set('accent')}
     />
     <Knob
       label="Drive"
       value={bass.drive}
-      defaultValue={0.2}
+      defaultValue={DEFAULT_BASS.drive}
       format={percent}
       onchange={set('drive')}
     />

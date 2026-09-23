@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ACCENT_Q_BOOST_DB,
   CUTOFF_MAX_HZ,
   CUTOFF_MIN_HZ,
   DECAY_MAX_S,
   DECAY_MIN_S,
   DRIVE_MAX_GAIN,
   ENV_MOD_MAX_OCTAVES,
-  RESONANCE_Q_MAX,
-  RESONANCE_Q_MIN,
+  RESONANCE_Q_MAX_DB,
+  RESONANCE_Q_MIN_DB,
   TUNING_RANGE_SEMITONES,
 } from './constants';
 import {
+  accentedQ,
   cutoffToHz,
   decayToSeconds,
   driveMakeupGain,
@@ -50,8 +52,8 @@ describe('mappings', () => {
     expect(cutoffToHz(1)).toBeCloseTo(CUTOFF_MAX_HZ, 6);
     expectMonotone(cutoffToHz);
 
-    expect(resonanceToQ(0)).toBe(RESONANCE_Q_MIN);
-    expect(resonanceToQ(1)).toBeCloseTo(RESONANCE_Q_MAX, 6);
+    expect(resonanceToQ(0)).toBe(RESONANCE_Q_MIN_DB);
+    expect(resonanceToQ(1)).toBeCloseTo(RESONANCE_Q_MAX_DB, 6);
     expectMonotone(resonanceToQ);
 
     expect(decayToSeconds(0)).toBe(DECAY_MIN_S);
@@ -61,6 +63,21 @@ describe('mappings', () => {
     expect(driveToPreGain(0)).toBe(1);
     expect(driveToPreGain(1)).toBeCloseTo(DRIVE_MAX_GAIN, 6);
     expectMonotone(driveToPreGain);
+  });
+
+  it('resonanceToQ est linéaire en dB : le milieu du knob est la moyenne des bornes', () => {
+    expect(resonanceToQ(0.5)).toBeCloseTo((RESONANCE_Q_MIN_DB + RESONANCE_Q_MAX_DB) / 2, 10);
+  });
+
+  it('accentedQ ajoute la même poussée en dB quelle que soit la résonance', () => {
+    expect(accentedQ(0, 1) - resonanceToQ(0)).toBeCloseTo(ACCENT_Q_BOOST_DB, 10);
+    expect(accentedQ(0.5, 1) - resonanceToQ(0.5)).toBeCloseTo(ACCENT_Q_BOOST_DB, 10);
+    expect(accentedQ(0.5, 0)).toBe(resonanceToQ(0.5));
+  });
+
+  it('accentedQ ne dépasse jamais la borne du biquad', () => {
+    expect(accentedQ(1, 1)).toBe(RESONANCE_Q_MAX_DB);
+    expect(accentedQ(0.9, 1)).toBeLessThanOrEqual(RESONANCE_Q_MAX_DB);
   });
 
   it('envModToCents va de 0 à ENV_MOD_MAX_OCTAVES octaves', () => {

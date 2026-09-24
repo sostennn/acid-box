@@ -511,8 +511,10 @@ Peu nombreux, marqués lents, exécutés en CI avec Playwright :
 
 ### 6.5 Ce qui reste à l'oreille
 
-Une checklist manuelle par lot dans le README (« écouter : pas de clic à
-l'arrêt, pas de zipper au knob, shuffle sensible, sidechain visible »).
+Chaque PR de lot liste, dans la section « À écouter » de sa description, ce que
+l'auteur a vérifié à l'oreille et que le reviewer refait. Le README garde la
+liste courte de ce qu'il faut réécouter à chaque lot, et l'enrichit quand un lot
+ajoute un risque qui vaut pour la suite.
 Le rendu musical final n'est pas automatisable ; le plan vise à ce que **tout
 ce qui est logique** le soit.
 
@@ -581,7 +583,7 @@ fichier.
 
 **Dette**
 
-- README : la liste « À écouter à chaque lot » ne couvre que les lots 0 et 5, alors que §6.5 promet une checklist par lot ; celles des lots 1 à 4 vivent dans les descriptions de PR.
+Aucune dette connue.
 
 **Points ouverts**
 

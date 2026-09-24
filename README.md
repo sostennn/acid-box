@@ -71,3 +71,6 @@ patterns et enregistrement (v3), export WAV, partage par URL et Web MIDI (v4).
 - Un mute ou un démute en lecture tombe sur le premier temps de la mesure suivante, sans clic ; l'interrupteur clignote en attendant.
 - Pas de bruit de « zipper » quand on tourne un knob.
 - Le curseur visuel tombe sur le pas que l'on entend, à 60 comme à 240 BPM.
+- Stop en plein slide ou sur un accent : pas de clic, pas de saut de hauteur.
+- Slide sur le pas 16 puis play : la première note sonne, puis glisse au tour suivant.
+- Résonance au maximum sur un pas accentué : pas d'instabilité.

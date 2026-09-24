@@ -9,13 +9,15 @@ description: >
   github.com/sostennn/acid-box/pull/N, branche feature/*), sur « mes changements »,
   « avant de merger », « c'est mergeable ? », ou veut poster une review sur GitHub, même
   sans employer le mot review. Dans ce dépôt, prend le pas sur code-review et sur
-  mr-craft:reviewing-mr. Arguments : [numéro | URL | branche] ; vide = branche courante
-  contre origin/main.
-argument-hint: '[numéro-PR | URL | branche]'
+  mr-craft:reviewing-mr. Arguments : [numéro | URL | branche] [--quick | --deep] ; vide =
+  branche courante contre origin/main.
+argument-hint: '[numéro-PR | URL | branche] [--quick | --deep]'
 allowed-tools: Bash(gh:*) Bash(git:*) Bash(pnpm:*) Bash(jq:*) Bash(mktemp:*) Bash(cat:*) Read Grep Glob Write Agent
 ---
 
 # Revue de PR — acid-box
+
+<!-- forged-by: forging-review-skill · 2026-09-23 · commit 577e06d · sources : README.md, docs/PLAN.md, configs d'outillage, code de main -->
 
 Ce dépôt a un contrat écrit inhabituellement précis : cinq principes d'architecture dans le
 README, douze hypothèses tranchées, un découpage en lots, une stratégie de tests module par
@@ -59,17 +61,16 @@ Argument : `$ARGUMENTS`.
 
 Si la CI est verte, ces points sont acquis. Ne pas les revérifier, ne pas les commenter.
 
-| Garanti par                                                                                                            | Ce que ça couvre                                                                                                                                                                       |
-| ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm typecheck` (svelte-check + tsc, `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnused*`) | Types, exhaustivité du `switch` du reducer, index de tableau possiblement `undefined`                                                                                                  |
-| ESLint                                                                                                                 | Frontière `src/engine` → aucun import de `svelte` ni de `src/ui` ; `setTimeout`/`setInterval` interdits dans le moteur hors `timer.worker.ts` et tests                                 |
-| Stylelint, sur `src/**/*.{css,svelte}`                                                                                 | Couleurs, rayons, `font-size`, `font-family`, espacements et `box-shadow` littéraux interdits hors `src/ui/theme/tokens.css` ; pas les attributs `style=` inline ni le CSS hors `src/` |
-| Prettier                                                                                                               | Formatage, README et docs compris                                                                                                                                                      |
-| Vitest + `tests/fakes`                                                                                                 | Ce que les tests couvrent ; `FakeAudioParam` lève sur une rampe exponentielle vers ≤ 0                                                                                                 |
+| Garanti par                                                                                                            | Ce que ça couvre                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm typecheck` (svelte-check + tsc, `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnused*`) | Types, index de tableau possiblement `undefined` ; exhaustivité du `switch` du reducer tant qu'il n'a pas de `default`                                                                                                                                                                                        |
+| ESLint                                                                                                                 | Frontière `src/engine` → aucun import de `svelte` ni de `src/ui` ; `setTimeout`/`setInterval` nus interdits dans le moteur hors `timer.worker.ts` et tests. Pas `window.setTimeout` et variantes (B1), ni les imports profonds `@engine/*` depuis l'UI (A4), ni les promesses non attendues (lint sans types) |
+| Stylelint, sur `src/**/*.{css,svelte}`                                                                                 | Couleurs, rayons, `font-size`, `font-family`, espacements et `box-shadow` littéraux interdits hors `src/ui/theme/tokens.css` ; pas `width`, `height`, `line-height`, les durées de `transition`, les attributs `style=` inline ni le CSS hors `src/` (E4)                                                     |
+| Prettier                                                                                                               | Formatage, README et docs compris                                                                                                                                                                                                                                                                             |
+| Vitest + `tests/fakes`                                                                                                 | Ce que les tests couvrent, tant que la PR ne les affaiblit pas (F2) ; `FakeAudioParam` lève sur une rampe exponentielle vers ≤ 0, une source lève sur un second `start()`                                                                                                                                     |
 
-Le travail du reviewer commence là où ce tableau s'arrête : `references/invariants.md`
-liste précisément ce qui n'est pas couvert, et sa section C0 rappelle les unités et
-sémantiques Web Audio qu'aucun outil ne vérifie.
+Le travail du reviewer commence là où ce tableau s'arrête : `references/invariants.md`,
+dont la section C0 rappelle les unités Web Audio qu'aucun outil ne vérifie.
 
 ---
 
@@ -91,6 +92,17 @@ revue quand même, ne rien poster sans accord explicite.
 
 Le mode local ne poste jamais rien : il sert à corriger avant d'ouvrir la PR.
 
+**Profondeur** : sobre par défaut, une seule passe sans sous-agent.
+
+| Option    | Pour                                         | Ce qui change                                                                                                        |
+| --------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `--quick` | petite PR, avant push, « c'est mergeable ? » | diff et sections d'invariants des domaines touchés ; contexte lu pour confirmer un finding seulement ; rapport court |
+| aucune    | cas général                                  | une passe inline, contexte hors diff par recherches ciblées, vérification adversariale complète                      |
+| `--deep`  | demande explicite                            | un sous-agent par domaine (4b) ; au-delà de 1500 lignes, le proposer en tête du rapport sans le lancer               |
+
+Ordre de grandeur : quelques dizaines de milliers de tokens en `--quick`, une centaine en
+passe normale, 50 à 100 k par sous-agent en `--deep`.
+
 ---
 
 ## Étape 1 — Collecte
@@ -104,8 +116,8 @@ Tout en parallèle. Les commandes exactes sont dans `references/github.md`.
 - `git fetch origin pull/N/head` : `FETCH_HEAD` est la version revue. Puis la base :
   `BASE=$(git merge-base origin/<baseRefName> FETCH_HEAD)`, ou pour une PR fusionnée
   `BASE=$(git rev-parse <mergeCommit>^1)`.
-- `git diff "$BASE" FETCH_HEAD --stat` et `--name-only`. Le diff complet n'est lu par
-  l'orchestrateur que sans fan-out ; avec fan-out, chaque sous-agent lit le sien.
+- `git diff "$BASE" FETCH_HEAD --stat` et `--name-only`. En `--deep`, l'orchestrateur ne
+  lit pas le diff complet : chaque sous-agent lit le sien.
 - **Ne jamais lire le worktree en mode PR** : il peut être sur une autre branche, avec des
   fichiers que la PR ne contient pas. Fichier complet : `git show FETCH_HEAD:<chemin>` ;
   numéro de ligne côté nouveau fichier : `git show FETCH_HEAD:<chemin> | grep -n '<extrait>'`.
@@ -119,37 +131,38 @@ Tout en parallèle. Les commandes exactes sont dans `references/github.md`.
 - `git diff "$BASE" --stat`, `git diff "$BASE"` (worktree inclus), `git log "$BASE"..HEAD --oneline`.
 - Messages de commit : anglais, `type(scope): message`. Un écart est un Nit, pas plus.
 
-**Taille** : au-delà de 400 lignes modifiées ou de trois domaines touchés, le fan-out de
-l'étape 4 devient obligatoire. Au-delà de 2000, prévenir et proposer une revue en
-plusieurs passes par domaine.
+**Taille** : au-delà de 1500 lignes, proposer `--deep` en tête du rapport sans le lancer ;
+au-delà de 3000, proposer une revue en plusieurs passes par domaine.
 
 ---
 
 ## Étape 2 — Contexte projet
 
-1. Lire `references/invariants.md` **en entier**. C'est la mémoire du projet distillée
-   pour la revue ; elle est courte à l'échelle d'une session et évite les faux positifs.
-   Sa section C0 (unités Web Audio) et ses repères temporels servent à chaque finding qui
-   compare des durées ou des unités.
+1. Lire dans `references/invariants.md` les repères temporels, les sections A et C0, et
+   celles des domaines touchés ; le fichier entier seulement au-delà de trois domaines.
 2. Identifier le lot de la PR avec `references/lot-checklists.md`, section « Identifier le
-   lot », puis lire la section de ce lot. Sans lot identifiable, utiliser la checklist
-   « Hors lot ». Le code fait foi : si la checklist attribue au lot quelque chose que la PR
-   n'a pas, ou l'inverse, le noter en « Hors périmètre » et continuer.
-3. Si la PR modifie `docs/PLAN.md` ou `README.md`, lire ces hunks. Les références de ce
-   skill datent du 2026-09-23 : le plan fait foi, et le rapport signalera que le skill
-   doit être rafraîchi.
-4. Cartographier les fichiers touchés vers les domaines. La dernière colonne liste le
-   contexte hors diff à relire pour vérifier les invariants du domaine :
+   lot », puis lire la section de ce lot ; l'état des lots est dans la feuille de route du
+   README. Sans lot identifiable, utiliser la checklist « PR hors lot ». Le code fait foi :
+   un écart entre la checklist et la PR va en « Hors périmètre ».
+3. Lire la section « Dette et points ouverts » de `docs/PLAN.md`, et les hunks de
+   `docs/PLAN.md` ou `README.md` que la PR modifie. Le skill ne porte que des règles qui
+   citent le plan : une PR qui change une décision la change dans le plan. Une règle du
+   skill contredite par le plan ou le code : le plan fait foi, et le rapport propose deux
+   lignes dans le bloc « Ajouts manuels » d'`invariants.md` ; un `--refresh` complet est
+   réservé aux refontes du plan.
+4. Cartographier les fichiers touchés vers les domaines. Le contexte hors diff se consulte
+   par `git grep -n '<symbole>' <HEAD_REF> -- <fichier>` ; un fichier entier seulement
+   pour confirmer un finding :
 
-| Domaine   | Fichiers                                                                                                     | Invariants                        | Contexte hors diff                                                                                                            |
-| --------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| frontière | `src/engine/index.ts`, `src/ui/state/engine.svelte.ts`, tout import croisé                                   | section A                         | `src/engine/index.ts` (ré-exports)                                                                                            |
-| horloge   | `src/engine/clock/**`, câblage du scheduler dans `index.ts`, `src/ui/playhead/**`                            | section B                         | `clock/timing.ts`, `clock/scheduler.ts`, `model/constants.ts`                                                                 |
-| synthèse  | `src/engine/synth/**`, `src/engine/audio/**`                                                                 | section C                         | `audio/params.ts`, `model/constants.ts`, `model/mapping.ts`, `synth/graph.ts`                                                 |
-| modèle    | `src/engine/model/**`, `state.ts`, `commands.ts`                                                             | section D                         | `model/defaults.ts`, `model/types.ts`, `state.ts`                                                                             |
-| interface | `src/ui/**`                                                                                                  | section E                         | `gestures/knob-math.ts`, `gestures/knob-drag.ts`, `components/Knob.svelte`, `components/Transport.svelte`, `theme/tokens.css` |
-| tests     | `**/*.test.ts`, `tests/**`                                                                                   | `references/test-expectations.md` | `tests/fakes/*`, tests voisins non touchés des modules modifiés                                                               |
-| livraison | `.github/**`, `package.json`, `pnpm-lock.yaml`, `vite.config.ts`, configs lint et TS, `README.md`, `docs/**` | section G                         | `README.md` « Feuille de route » et « À écouter »                                                                             |
+| Domaine   | Fichiers                                                                                                     | Invariants                        | Contexte hors diff                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| frontière | `src/engine/index.ts`, `src/ui/state/engine.svelte.ts`, tout import croisé                                   | section A                         | `src/engine/index.ts` (ré-exports)                                                                                             |
+| horloge   | `src/engine/clock/**`, câblage du scheduler dans `index.ts`, `src/ui/playhead/**`                            | section B                         | `clock/timing.ts`, `clock/scheduler.ts`, `model/constants.ts`                                                                  |
+| synthèse  | `src/engine/synth/**`, `src/engine/audio/**`                                                                 | section C                         | `audio/params.ts`, `model/constants.ts`, `model/mapping.ts`, `synth/graph.ts`, état de la voix dans `synth/bass/bass-voice.ts` |
+| modèle    | `src/engine/model/**`, `state.ts`, `commands.ts`                                                             | section D                         | `model/defaults.ts`, `model/types.ts`, `model/pattern.ts`, `state.ts`                                                          |
+| interface | `src/ui/**`                                                                                                  | section E                         | `gestures/knob-math.ts`, `gestures/knob-drag.ts`, `components/Knob.svelte`, `components/Transport.svelte`, `theme/tokens.css`  |
+| tests     | `**/*.test.ts`, `tests/**`                                                                                   | `references/test-expectations.md` | `tests/fakes/*`, tests voisins non touchés des modules modifiés                                                                |
+| livraison | `.github/**`, `package.json`, `pnpm-lock.yaml`, `vite.config.ts`, configs lint et TS, `README.md`, `docs/**` | section G                         | `README.md` « Feuille de route » et « À écouter »                                                                              |
 
 Un finding appartient au domaine du **fichier** où il se trouve : une constante du
 moteur recopiée dans un composant est un finding du domaine interface, sourcé D2.
@@ -202,29 +215,24 @@ sans corriger. Si la PR touche `vite.config.ts`, un worker ou la CI, exécuter a
 ### 4b — Invariants par domaine
 
 Pour chaque domaine touché, parcourir sa section de `references/invariants.md` contre le
-diff **et** contre les fichiers complets à la version revue, plus le contexte hors diff de
-la table. Chaque invariant dit comment se vérifier.
+diff et le contexte ciblé de la table. Sans option et en `--quick`, l'orchestrateur le
+fait lui-même.
 
-**Fan-out** au-delà de 400 lignes ou de trois domaines : un sous-agent `general-purpose`
-par domaine touché, au plus cinq, en regroupant un domaine à un seul fichier avec son
-voisin (frontière avec modèle, livraison traitée inline en 4a). Tous lancés **dans le même
-message et attendus** : pas en arrière-plan, sinon leurs résultats ne reviennent pas quand
-l'orchestrateur est lui-même un sous-agent. Compter environ 150 k tokens par sous-agent :
-le fan-out se justifie par la taille, pas par confort. Chaque prompt est autonome :
+**Fan-out, en `--deep` seulement** : un sous-agent `general-purpose` par domaine touché, au
+plus cinq (frontière avec modèle, livraison inline en 4a), lancés **dans le même message et
+attendus**, jamais en arrière-plan. L'orchestrateur extrait une fois la posture, la table
+outillage, les sections A, C0 et celle du domaine, et les colle dans le prompt :
 
 ```
 Tu analyses le domaine <DOMAINE> de <PR #N | la branche locale> du dépôt acid-box,
 en lecture seule. Ne modifie rien, ne poste rien, ne lis jamais le worktree en mode PR.
-1. Lis `.claude/skills/reviewing-pr/SKILL.md` sections « Posture » et « Ce que l'outillage
-   garantit déjà », `.claude/skills/reviewing-pr/references/invariants.md` sections A, C0
-   et <LETTRE> (pour le domaine tests : `references/test-expectations.md` en entier),
-   et la section « Lot <N> » de `references/lot-checklists.md`.
-2. Fichiers du domaine : <LISTE>. Contexte hors diff à relire : <CONTEXTE>.
-   Diff : `git diff <BASE> <HEAD_REF> -- <LISTE>`.
-   Fichier complet et numéros de ligne : `git show <HEAD_REF>:<chemin>` puis `| grep -n`.
-3. Vérifie chaque invariant de la section sur le diff et sur les fichiers complets.
-   Ignore ce que l'outillage garantit. Ne commente que ce que la PR touche ; un écart
-   préexistant va dans HORS_PERIMETRE.
+Ne relis pas le skill : les règles utiles sont ci-dessous.
+<POSTURE, TABLE OUTILLAGE, SECTIONS A, C0 ET <LETTRE>, COLLÉES>
+1. Fichiers du domaine : <LISTE>. Diff : `git diff <BASE> <HEAD_REF> -- <LISTE>`.
+2. Contexte : <CONTEXTE>, par `git grep -n '<symbole>' <HEAD_REF> -- <fichier>` ;
+   `git show <HEAD_REF>:<chemin>` en entier seulement pour confirmer un finding.
+3. Vérifie chaque invariant collé sur le diff. Ignore ce que l'outillage garantit ; un
+   écart préexistant va dans HORS_PERIMETRE.
 4. Réponds uniquement par les trois blocs ci-dessous, `[]` quand ils sont vides.
 ```
 
@@ -249,20 +257,21 @@ HORS_PERIMETRE:
 ```
 
 `CONFORMES` permet un verdict étayé (« C1 à C10 vérifiés ») plutôt qu'un simple décompte
-de findings. Sans fan-out, appliquer les mêmes sections inline et produire les mêmes blocs.
+de findings. Sans fan-out, produire les mêmes blocs sans les afficher.
 
 ---
 
 ## Étape 5 — Vérification adversariale
 
 C'est l'étape qui fait la différence entre une revue utile et du bruit. Pour chaque
-finding candidat :
+finding candidat (en `--quick`, étapes 1, 3, 4 et 5) :
 
 1. Relire le fichier complet à la version revue, pas seulement le hunk.
 2. Chercher si l'invariant est déjà assuré ailleurs. Exemples réels : `safeTime` dans
    `bass-voice.apply` couvre tous les événements d'un plan, donc `bass-plan.ts` n'a pas
    à borner ses temps ; `clamp` dans le reducer couvre les valeurs venues de l'interface ;
-   `smoothSet` dans `applyMix` couvre les gains du mix.
+   `smoothSet` dans `applyMix` couvre les gains du mix ; l'état de la voix décide la
+   liaison, donc `bass-plan.ts` n'a pas à lire le pattern.
 3. Confirmer que la ligne pointée existe côté nouveau fichier et fait partie du diff.
    Sinon, choisir la ligne du diff la plus proche ou basculer en commentaire global.
 4. Fixer la sévérité :
@@ -323,8 +332,9 @@ Lot <n> — <nom> · CI <verte | rouge | absente | en cours> · +<a>/−<d> sur 
 - <références de ce skill à rafraîchir, si le code les contredit>
 ```
 
-En mode local, terminer par « Corrections proposées, dans l'ordre », sans les appliquer :
-la revue s'arrête au diagnostic, l'auteur décide.
+En `--quick`, garder l'en-tête, le verdict, les bloquants, les suggestions et « À écouter » ;
+le reste seulement en cas d'écart. En mode local, terminer par « Corrections proposées,
+dans l'ordre », sans les appliquer : la revue s'arrête au diagnostic, l'auteur décide.
 
 ---
 
@@ -365,8 +375,6 @@ Terminer par l'URL de la review et le nombre de commentaires postés.
 - PR introuvable : vérifier l'argument, proposer `gh pr list`.
 - `git fetch origin pull/N/head` refusé : lire les fichiers via `gh api` (voir
   `references/github.md`), ne pas changer de branche.
-- Références en retard sur `docs/PLAN.md` ou contredites par le code : le code et le plan
-  font foi, le signaler dans « Hors périmètre ».
 - Worktree sale en mode local : c'est normal, le diff l'inclut ; ne jamais `stash` ni
   `checkout` sans demande.
 
@@ -383,8 +391,10 @@ Terminer par l'URL de la review et le nombre de commentaires postés.
   ou un champ `length` sur le pattern : ces choix sont tranchés dans le plan.
 - Oublier que la valeur d'un knob dans l'état est normalisée 0..1 et croire à un bug
   d'unité.
-- Lancer les sous-agents en arrière-plan, ou lire le diff complet avant de le leur
-  redistribuer.
+- Exiger une ancre `set` devant le glissé du slide, ou une tenue lue dans le pattern : le
+  glissé est un `setTargetAtTime` et la liaison vient de la voix (C2, C11).
+- Lancer le fan-out sans `--deep`, en arrière-plan, ou en faisant relire tout le skill aux
+  sous-agents ; lire des fichiers entiers « au cas où » au lieu d'une recherche ciblée.
 - Approuver seul, ou tenter `APPROVE` sur sa propre PR.
 - Corriger le code pendant la revue, ou partir en debug de la CI.
 - Poster N commentaires isolés au lieu d'une seule review.

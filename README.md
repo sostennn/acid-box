@@ -51,16 +51,16 @@ plus tard, par des tests hors ligne.
 
 Le plan détaillé est dans [docs/PLAN.md](docs/PLAN.md).
 
-| Lot | Contenu                                      | État     |
-| --- | -------------------------------------------- | -------- |
-| 0   | Socle, outillage, déblocage audio, CI, Pages | en cours |
-| 1   | Horloge, transport, tête de lecture          |          |
-| 2   | Le knob et le geste                          |          |
-| 3   | La voix basse                                |          |
-| 4   | Accent et slide                              |          |
-| 5   | Rythmique et sidechain                       |          |
-| 6   | Générateur de patterns                       |          |
-| 7   | Persistance, robustesse, finition            |          |
+| Lot | Contenu                                      | État |
+| --- | -------------------------------------------- | ---- |
+| 0   | Socle, outillage, déblocage audio, CI, Pages | fait |
+| 1   | Horloge, transport, tête de lecture          | fait |
+| 2   | Le knob et le geste                          | fait |
+| 3   | La voix basse                                | fait |
+| 4   | Accent et slide                              | fait |
+| 5   | Rythmique et sidechain                       |      |
+| 6   | Générateur de patterns                       |      |
+| 7   | Persistance, robustesse, finition            |      |
 
 Versions ultérieures : filtre en échelle en AudioWorklet (v2), banque de
 patterns et enregistrement (v3), export WAV, partage par URL et Web MIDI (v4).
@@ -69,4 +69,4 @@ patterns et enregistrement (v3), export WAV, partage par URL et Web MIDI (v4).
 
 - Pas de clic à l'arrêt ni au changement de forme d'onde.
 - Pas de bruit de « zipper » quand on tourne un knob.
-- Le curseur visuel tombe sur le pas que l'on entend, à 60 comme à 160 BPM.
+- Le curseur visuel tombe sur le pas que l'on entend, à 60 comme à 240 BPM.

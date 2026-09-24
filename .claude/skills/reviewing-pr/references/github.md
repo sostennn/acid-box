@@ -1,5 +1,9 @@
 # GitHub via `gh` — collecte et publication
 
+<!-- forged-by: forging-review-skill · 2026-09-23 · commit 577e06d · sources : fiche plateforme github, gh 2.x, dépôt sostennn/acid-box -->
+
+État au 2026-09-23 : le comportement de `gh` et de l'API GitHub fait foi.
+
 Dépôt : `sostennn/acid-box`. `gh` résout `{owner}` et `{repo}` depuis le remote courant.
 `<REF>` désigne indifféremment un numéro, une URL ou un nom de branche : `gh pr view` les
 accepte tous.
@@ -61,7 +65,8 @@ git show FETCH_HEAD:<chemin> | grep -n '<extrait>'                # numéro de l
 Décompte des tests à la version revue, à comparer au chiffre de la description :
 
 ```bash
-git grep -c -E '^\s*it\(' FETCH_HEAD -- 'src/**/*.test.ts' 'tests/**/*.test.ts' | awk -F: '{ s += $NF } END { print s }'
+git grep -c -E '^[[:space:]]*it\(' FETCH_HEAD -- 'src/**/*.test.ts' 'tests/**/*.test.ts' | awk -F: '{ s += $NF } END { print s }'
+# `[[:space:]]` et non `\s` : le git grep de macOS (ERE POSIX) ne connaît pas `\s`.
 ```
 
 Evidence sans CI (check absent ou en attente), toujours hors du worktree :

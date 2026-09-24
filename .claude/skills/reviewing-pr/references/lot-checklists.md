@@ -1,14 +1,14 @@
 # Checklists par lot
 
+<!-- forged-by: forging-review-skill · 2026-09-23 · commit 577e06d · sources : docs/PLAN.md §3 §5 §7 §8, README.md, descriptions des PR -->
+
 Dérivé de `docs/PLAN.md` §5 (lots), §3 (arborescence cible), §7 (risques), §8 (roadmap
-v2+), « Vérification de fin de v1 », et des PR #1 à #4. État au 2026-09-23 : lots 0 à 3
-fusionnés (PR #1 à #3), lot 4 en cours sur `feature/accent-slide` avec la PR #4 ouverte,
-CI verte.
+v2+) et « Vérification de fin de v1 ». État au 2026-09-23. L'état des lots (livré, en
+cours) se lit dans la feuille de route du README, pas ici.
 
 **Le code fait foi.** Ces checklists décrivent ce que le plan attend ; si une PR contient
 autre chose, c'est la PR qu'on lit et la checklist qu'on signale en « Hors périmètre »
-pour rafraîchissement. Attention en particulier : ce fichier a été rédigé depuis un worktree
-sur la branche du lot 4, pas depuis `main`.
+pour rafraîchissement.
 
 ---
 
@@ -54,76 +54,24 @@ Observée sur les PR #1 à #4, non versionnée dans `.github/` :
 ```
 
 Titre : `type(scope): description in English (lot N)`, sans le verbe du commit. Scopes
-vus : `project`, `clock`, `ui`, `synth`. Attendus : `pattern`, `drums`, `generator`,
-`persistence`, `ci`, `docs`. Branches : `feature/<sujet-kebab>`. Merge par merge-commit.
+vus : `project`, `clock`, `ui`, `synth` ; attendus : `pattern`, `drums`, `generator`,
+`persistence`, `ci`, `docs`. Branches : `feature/<sujet-kebab>` pour un lot,
+`chore/<sujet-kebab>` sinon. Merge par merge-commit. Une PR hors lot n'a pas de suffixe et
+remplace « À écouter » et « Tests » par « Vérifications » et « À essayer ».
 
 ---
 
-## Lot 0 — Socle et premier son (fusionné, commit `5d5df1b`)
+## Lots livrés
 
-- Livre : scaffold Vite + Svelte 5 + TS strict, pnpm, ESLint/Prettier/Stylelint/svelte-check,
-  Vitest ; `tokens.css` et `base.css` avec la règle Stylelint ; frontière ESLint ;
-  `audio/context.ts` avec déblocage sur geste ; `AudioGate.svelte` ; CI et Pages ; README.
-- Risques §7 : autoplay policy, iOS `interrupted`, Pages base path.
-- Fait. Toute PR qui retouche ce socle est « hors lot » ou « livraison » (section G).
+Les lots marqués « fait » dans le README ne reçoivent plus de checklist : une PR qui
+retouche leur code est une PR hors lot, ou fait partie du lot en cours. Appliquer alors
+les invariants du domaine touché, en particulier, pour la voix basse, C3, C4, C6, C11 et
+C12, et relire les décisions du lot concerné dans PLAN §5.
 
-## Lot 1 — Horloge, transport, tête de lecture (fusionné, PR #1)
-
-- Livre : types du modèle, `defaults.ts`, `constants.ts`, reducers du transport ;
-  `timing.ts` ; `worker-timer.ts` + `timer.worker.ts` + `scheduler.ts` ;
-  `playhead-queue.ts` + `playhead.svelte.ts` ; `Transport.svelte` ; barre d'espace.
-- Hypothèses : H10 (worker), H12 (latence d'édition).
-- Fait. Le métronome provisoire a été retiré au lot 3.
-
-## Lot 2 — Le knob et le geste (fusionné, PR #2)
-
-- Livre : `knob-drag.ts` + `knob-math.ts`, `Knob.svelte` + `knob-arc.ts`, écriture lissée
-  via `setTargetAtTime`, bus master et commande `mix/set`.
-- Fait. `knobDrag` est un geste **continu** (`KNOB_DRAG_RANGE_PX = 200`,
-  `KNOB_KEY_STEP = 0.01`, `KNOB_FINE_FACTOR = 0.125`) : tout consommateur à valeurs
-  discrètes doit lui donner une résolution ou accumuler pendant le geste (invariant E3).
-
-## Lot 3 — La voix basse (fusionné, PR #3, tête `a587d8a`)
-
-- Livre : `graph.ts` (bus basse → master), `filter-stage.ts` (biquad lowpass,
-  `frequency` pour le knob, `detune` pour l'enveloppe), `bass-voice.ts`, `bass-plan.ts`
-  (note, octave, silence, gate, enveloppe de filtre à decay seul, VCA), `drive.ts`,
-  `mapping.ts` complet, `pitch.ts`, pattern par défaut en Do mineur, commandes
-  `pattern/setStep`, `pattern/toggleStepFlag` (drapeau `rest` seul en interface),
-  `bass/setWaveform`, `bass/setKnob`, `BassPanel.svelte`, `BassSequencer.svelte`,
-  `StepCell.svelte` (hauteur au drag sur trois octaves, silence), retrait du métronome.
-- Fait. **Pas dans la PR #3** : `model/pattern.ts` (`holdContext`), les drapeaux accent et
-  slide de `StepCell`, les branches accent et slide de `bass-plan.ts` et leurs tests. Tout
-  cela est le lot 4.
-- Écarts au plan constatés à la livraison : cutoff `80–6000 Hz` au lieu de « 20 Hz–~8 kHz »
-  (§5 lot 3), cibles `frequency | filterDetune | filterQ | vca` au lieu de `cutoff | q`
-  (§4), tuning appliqué par `applyParams` sur `oscillator.detune` et non par le plan.
-  Décisions défendables, non écrites dans le plan : à consigner.
-
-## Lot 4 — Accent et slide (en cours, PR #4 sur `feature/accent-slide`, commit `7f165c6`)
-
-- Livre :
-  - accent dans `bass-plan.ts` : pic de VCA, ouverture de filtre supplémentaire, résonance
-    poussée, profondeur par le knob accent, décroissance fixe `ACCENT_ENV_DECAY_S` ;
-  - slide : glissé exponentiel de fréquence sur `SLIDE_TIME_S` **sans** événement
-    d'enveloppe ; note tenue jusqu'au prochain pas joué, à travers les silences
-    (`model/pattern.ts`, `holdContext`) ; bouclage 15 → 0 ;
-  - drapeaux accent / slide dans `StepCell.svelte`, indication « tenu » ;
-  - cas limites **documentés et testés** : slide sur le dernier pas, chaîne de slides,
-    accent + slide, tous les pas en silence.
-- Hypothèses : slide → silence = note tenue et glissée vers le prochain pas joué
-  (décision de la table « Décisions déjà prises »).
-- Risques §7 : automations qui se chevauchent (`cancel` puis ré-ancrage, C3), rampes
-  exponentielles (ancre avant `expRamp`, C2), clic à l'arrêt en plein slide (C6).
-- Tests §6.1 attendus : ligne `bass-plan.ts` complète, plus les quatre cas limites ;
-  `index.test.ts` « un slide dans le pattern produit une rampe au pas suivant » étendu au
-  bouclage ; `StepCell.svelte.test.ts` : bascule accent et slide, indication « tenu ».
-- À écouter : le phrasé acid ; slide sur le dernier pas vers le premier ; chaîne de slides
-  à travers des silences ; accent seul ; stop en plein slide sans clic.
-- Vigilance : le slide ne redéclenche pas l'enveloppe ; un pas qui slide laisse le VCA
-  ouvert et c'est le pas d'arrivée qui ferme ; les durées dérivées (gate, glissé) doivent
-  tenir compte du créneau réel jusqu'au prochain onset, shuffle compris (voir « Points
-  ouverts ») ; C3 : chaque cible commence par un `cancel` au temps du pas.
+À écouter quand une PR touche la voix basse : phrasé acid du pattern par défaut ; slide du
+pas 16 vers le pas 1 au premier play ; chaîne de slides à travers des silences ; shuffle
+maximal à tempo élevé avec slide vers un pas impair ; accent avec résonance au maximum ;
+knob résonance tourné pendant une ligne accentuée ; stop en plein slide ou sur un accent.
 
 ## Lot 5 — Rythmique et sidechain
 
@@ -147,7 +95,11 @@ vus : `project`, `clock`, `ui`, `synth`. Attendus : `pattern`, `drums`, `generat
   par le fermé ; mute instantané sans clic.
 - Vigilance : timbres fixés par constantes (pas de knobs de timbre) ; la grille lit le
   même `audibleStep` que la basse (B4) ; le sidechain n'écrit que sur le bus basse ; la
-  vélocité de la grille est un consommateur discret de `knobDrag` (E3).
+  vélocité de la grille est un consommateur discret de `knobDrag` (E3) ; le choke du hat
+  ouvert se décide d'après ce qui sonne, comme la liaison (C11) ; enveloppes de frappe et
+  courbe de ducking en `setTargetAtTime` plutôt qu'en rampes (C2), avec des échéances
+  qui tiennent dans le créneau d'un 16e impair (C12) ; `release` de chaque nouvelle voix
+  appelé par `stop()` (C6).
 
 ## Lot 6 — Générateur de patterns
 
@@ -203,50 +155,12 @@ Correctif, chore, docs, CI. Checklist minimale :
 
 ---
 
-## Dette connue au 2026-09-23
+## Dette et points ouverts
 
-À signaler en « Hors périmètre » si une PR passe à côté, à suggérer si elle touche le
-fichier :
-
-- README « Feuille de route » : colonne État encore à « lot 0 en cours » alors que les
-  lots 1 à 3 sont fusionnés ; liste « À écouter à chaque lot » jamais enrichie depuis le
-  lot 0.
-- `Transport.svelte` recopie `125` et `0.8` ; `BassPanel.svelte` recopie les sept valeurs
-  de `DEFAULT_BASS` ; `StepCell.svelte` recopie `DEFAULT_STEP`. `BPM_DEFAULT`,
-  `DEFAULT_BASS`, `DEFAULT_STEP`, `DEFAULT_MIX` ne sont pas exportés par `@engine` (D2, A4).
-- Tests exigés par le plan et absents : frontière `@engine` en node pur (§6.2), pont
-  `engine.svelte.ts` avec un moteur factice (§6.3).
-- Dérives du plan : §6.3 dit jsdom, le code utilise happy-dom ; §3 mentionne un
-  `vitest.config.ts` qui n'existe pas (config dans `vite.config.ts`) ; §5 lot 3 dit
-  « 20 Hz–~8 kHz » pour le cutoff, le code dit 80–6000 Hz ; §4 décrit des cibles
-  `cutoff | q` remplacées par `filterDetune | filterQ`.
-- `tests/fakes/fake-audio-context.ts` : `ParamCall` n'enregistre pas `timeConstant` et
-  `cancelScheduledValues` enregistre `value: NaN`.
-- `constants.ts` : le commentaire de `MAX_LATE_S` décrit le métronome à une source par
-  frappe, plus la voix monophonique.
-
-## Points ouverts remontés par la revue à blanc du 2026-09-22
-
-Trouvés sur la PR #3 par deux revues indépendantes, non tranchés par l'auteur : à
-confirmer par lui, jamais à reprocher à une PR qui ne touche pas la ligne.
-
-- `mapping.ts` / `constants.ts` : le `Q` d'un biquad lowpass est en dB (C0) ; `resonanceToQ`
-  applique une exponentielle à une grandeur déjà logarithmique et `BassPanel` affiche
-  « Q 18.0 » pour 18 dB.
-- `StepCell.svelte` + `knobDrag` : la hauteur est quantifiée mais le geste relit la valeur
-  quantifiée à chaque événement ; un drag lent ou une flèche ne change jamais la note,
-  Shift est inopérant (E3).
-- `index.ts` → `bass-plan.ts` : le gate est calculé sur la durée nominale du pas alors que
-  `time` inclut le shuffle ; à shuffle > 0,9 la fermeture du pas impair tombe après
-  l'attaque du pas pair, dont le `cancel` l'efface.
-- `bass-voice.ts` : `safeTime` appliqué événement par événement écrase les durées d'un pas
-  en retard ; au-delà du gate de retard, attaque et relâchement tombent au même instant
-  et la note est avalée (B2).
-- `App.svelte` : la garde `[role="slider"]` sur la barre d'espace la neutralise après tout
-  geste, `knobDrag` posant le focus sur le slider (H11, E5).
-- `bass-plan.ts` / `constants.ts` : le plancher `MIN_GAIN` est inutile sous
-  `setTargetAtTime` et son résidu est amplifié par le drive ; contestation argumentée
-  d'une parade §7, pas un bloquant (D5).
+Ils sont dans `docs/PLAN.md`, section « Dette et points ouverts ». Les signaler en « Hors
+périmètre » quand une PR passe à côté, les suggérer quand elle touche le fichier, et ne
+jamais les reprocher à une PR qui ne touche pas la ligne. Une PR qui en corrige un retire
+sa ligne du plan : si elle ne le fait pas, c'est une Suggestion.
 
 ---
 

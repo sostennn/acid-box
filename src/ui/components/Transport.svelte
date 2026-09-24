@@ -1,6 +1,15 @@
 <script lang="ts">
-  import { BPM_MAX, BPM_MIN, type Command, type MixParams, type TransportState } from '@engine';
+  import {
+    BPM_MAX,
+    BPM_MIN,
+    DEFAULT_MIX,
+    DEFAULT_TRANSPORT,
+    type Command,
+    type MixParams,
+    type TransportState,
+  } from '@engine';
   import Knob from './Knob.svelte';
+  import Switch from './Switch.svelte';
 
   interface Props {
     transport: TransportState;
@@ -13,6 +22,10 @@
 
   const bpmToNormalized = (bpm: number) => (bpm - BPM_MIN) / (BPM_MAX - BPM_MIN);
   const normalizedToBpm = (value: number) => Math.round(BPM_MIN + value * (BPM_MAX - BPM_MIN));
+
+  const percent = (value: number) => `${Math.round(value * 100)} %`;
+  const setMix = (key: keyof MixParams) => (value: number) =>
+    dispatch({ type: 'mix/set', patch: { [key]: value } });
 
   function toggle() {
     dispatch({ type: playing ? 'transport/stop' : 'transport/play' });
@@ -34,7 +47,7 @@
   <Knob
     label="Tempo"
     value={bpmToNormalized(transport.bpm)}
-    defaultValue={bpmToNormalized(125)}
+    defaultValue={bpmToNormalized(DEFAULT_TRANSPORT.bpm)}
     format={(value) => `${normalizedToBpm(value)} BPM`}
     onchange={(value) => dispatch({ type: 'transport/setBpm', bpm: normalizedToBpm(value) })}
   />
@@ -45,12 +58,44 @@
     onchange={(value) => dispatch({ type: 'transport/setShuffle', value })}
   />
 
-  <Knob
-    label="Master"
-    value={mix.masterLevel}
-    defaultValue={0.8}
-    onchange={(value) => dispatch({ type: 'mix/set', patch: { masterLevel: value } })}
-  />
+  <div class="group" role="group" aria-label="Sidechain">
+    <Switch
+      label="Sidechain"
+      checked={transport.sidechain.enabled}
+      onchange={(enabled) => dispatch({ type: 'transport/setSidechain', patch: { enabled } })}
+    />
+    <Knob
+      label="Amount"
+      value={transport.sidechain.amount}
+      defaultValue={DEFAULT_TRANSPORT.sidechain.amount}
+      format={percent}
+      onchange={(amount) => dispatch({ type: 'transport/setSidechain', patch: { amount } })}
+    />
+  </div>
+
+  <div class="group" role="group" aria-label="Mix">
+    <Knob
+      label="Basse"
+      value={mix.bassLevel}
+      defaultValue={DEFAULT_MIX.bassLevel}
+      format={percent}
+      onchange={setMix('bassLevel')}
+    />
+    <Knob
+      label="Rythmique"
+      value={mix.drumsLevel}
+      defaultValue={DEFAULT_MIX.drumsLevel}
+      format={percent}
+      onchange={setMix('drumsLevel')}
+    />
+    <Knob
+      label="Master"
+      value={mix.masterLevel}
+      defaultValue={DEFAULT_MIX.masterLevel}
+      format={percent}
+      onchange={setMix('masterLevel')}
+    />
+  </div>
 </div>
 
 <style>
@@ -59,6 +104,12 @@
     align-items: center;
     gap: var(--space-6);
     flex-wrap: wrap;
+  }
+
+  .group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
   }
 
   .play {

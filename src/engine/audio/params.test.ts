@@ -15,8 +15,9 @@ describe('smoothSet', () => {
   it('écrit par setTargetAtTime avec la constante de lissage', () => {
     const param = new FakeAudioParam();
     smoothSet(param, 0.3, { currentTime: 4 });
-    expect(param.calls).toEqual([{ method: 'setTargetAtTime', value: 0.3, time: 4 }]);
-    expect(KNOB_SMOOTHING_S).toBeGreaterThan(0);
+    expect(param.calls).toEqual([
+      { method: 'setTargetAtTime', value: 0.3, time: 4, timeConstant: KNOB_SMOOTHING_S },
+    ]);
     expect(param.value).toBe(0);
   });
 });

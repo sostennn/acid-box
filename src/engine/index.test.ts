@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext, createFakeVisibility } from '../../tests/fakes/fake-audio-context';
 import { FakeTimer } from '../../tests/fakes/fake-clock';
 import { createEngine } from './index';
-import { BPM_DEFAULT, MIN_GAIN, START_DELAY_S } from './model/constants';
+import { BPM_DEFAULT, MIN_GAIN, SIDECHAIN_MAX_DEPTH, START_DELAY_S } from './model/constants';
+import { DEFAULT_TRANSPORT } from './model/defaults';
 import { midiToFrequency, pitchToMidi } from './model/pitch';
 import { stepDurationSeconds } from './clock/timing';
 
@@ -18,6 +19,22 @@ function setup() {
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** Les frappes arrêtent leur oscillateur dès sa création : seul celui de la basse est persistant. */
+const persistentOscillators = (ctx: FakeAudioContext) =>
+  ctx.oscillators.filter((oscillator) => oscillator.stoppedAt === null);
+
+/** Départs des kicks : les seuls oscillateurs arrêtés dès leur création. */
+const kickStarts = (ctx: FakeAudioContext) =>
+  ctx.oscillators.flatMap((oscillator) =>
+    oscillator.stoppedAt !== null && oscillator.startedAt !== null ? [oscillator.startedAt] : [],
+  );
+
+/** Gains de mute des tranches, branchés sur le bus rythmique, dans l'ordre des voix. */
+const muteGains = (ctx: FakeAudioContext, drums = ctx.gains[3]) =>
+  ctx.gains.filter((gain) => drums !== undefined && gain.connections.includes(drums));
+
+const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
 
 /** Le VCA est le gain branché en sortie du filtre de la voix basse. */
 const findVca = (ctx: FakeAudioContext) =>
@@ -59,7 +76,7 @@ describe('createEngine', () => {
     expect(engine.getState().transport.status).toBe('playing');
     expect(ctx.state).toBe('running');
     expect(timer.running).toBe(true);
-    expect(ctx.oscillators).toHaveLength(1);
+    expect(persistentOscillators(ctx)).toHaveLength(1);
 
     const firstStep = engine.getState().pattern.bass[0];
     const set = ctx.oscillators[0]?.frequency.calls.find((c) => c.method === 'setValueAtTime');
@@ -67,13 +84,14 @@ describe('createEngine', () => {
     expect(set?.value).toBeCloseTo(midiToFrequency(pitchToMidi(firstStep)), 6);
   });
 
-  it('route la voix par le bus basse puis le master', async () => {
+  it('route la voix par le bus basse, le sidechain puis le master', async () => {
     const { engine, ctx } = setup();
     engine.dispatch({ type: 'transport/play' });
     await flush();
-    const [master, bass] = ctx.gains;
+    const [master, bass, sidechain] = ctx.gains;
     expect(master?.connections).toContain(ctx.destination);
-    expect(bass?.connections).toContain(master);
+    expect(bass?.connections).toEqual([sidechain]);
+    expect(sidechain?.connections).toEqual([master]);
     expect(ctx.gains.some((g) => g.connections.includes(bass))).toBe(true);
   });
 
@@ -171,13 +189,147 @@ describe('createEngine', () => {
     ]);
   });
 
+  it('le premier pas déclenche le kick du groove et fait plonger la basse', async () => {
+    const { engine, ctx } = setup();
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+
+    const kicks = ctx.oscillators.filter((oscillator) => oscillator.stoppedAt !== null);
+    expect(kicks.map((kick) => kick.startedAt)).toEqual([START_DELAY_S]);
+    const sidechain = ctx.gains[2];
+    expect(sidechain?.gain.calls).toContainEqual(
+      expect.objectContaining({
+        method: 'setTargetAtTime',
+        time: START_DELAY_S,
+        value: 1 - DEFAULT_TRANSPORT.sidechain.amount * SIDECHAIN_MAX_DEPTH,
+      }),
+    );
+  });
+
+  it('un kick muté ne joue pas et ne fait pas plonger la basse', async () => {
+    const { engine, ctx } = setup();
+    engine.dispatch({ type: 'drums/setMuted', voice: 'kick', muted: true });
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+    expect(ctx.oscillators.filter((oscillator) => oscillator.stoppedAt !== null)).toEqual([]);
+    expect(ctx.gains[2]?.gain.calls).toEqual([]);
+  });
+
+  it('stop coupe les frappes programmées et remonte la basse', async () => {
+    const { engine, ctx } = setup();
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+    const kick = ctx.oscillators.find((oscillator) => oscillator.stoppedAt !== null);
+    engine.dispatch({ type: 'transport/stop' });
+    // Le kick n'avait pas encore démarré : arrêté avant son départ, il ne sonne pas.
+    expect(kick?.stoppedAt).toBeLessThanOrEqual(START_DELAY_S);
+    expect(ctx.gains[2]?.gain.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime', value: 1 });
+  });
+
+  it('niveau de voix, niveau rythmique et sidechain atteignent le graphe en lecture', async () => {
+    const { engine, ctx } = setup();
+    engine.dispatch({ type: 'transport/play' });
+    await flush();
+    const [, , sidechain, drums] = ctx.gains;
+    const openHatMute = muteGains(ctx, drums).at(-1);
+    const openHat = ctx.gains.find((gain) => openHatMute && gain.connections.includes(openHatMute));
+
+    engine.dispatch({ type: 'drums/setLevel', voice: 'openHat', value: 1 });
+    expect(openHat?.gain.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime', value: 1 });
+    engine.dispatch({ type: 'mix/set', patch: { drumsLevel: 1 } });
+    expect(drums?.gain.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime', value: 1 });
+    engine.dispatch({ type: 'transport/setSidechain', patch: { enabled: false } });
+    expect(sidechain?.gain.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime', value: 1 });
+  });
+
+  describe('mute quantifié à la mesure', () => {
+    const step = stepDurationSeconds(BPM_DEFAULT);
+    const nextBar = START_DELAY_S + 16 * step;
+
+    async function playing() {
+      const env = setup();
+      env.engine.dispatch({ type: 'transport/play' });
+      await flush();
+      const scheduleUntil = (time: number) => {
+        env.ctx.currentTime = time - 0.05;
+        env.timer.tick();
+      };
+      return { ...env, scheduleUntil };
+    }
+
+    it('un mute en lecture ne s’entend qu’au début de la mesure suivante', async () => {
+      const { engine, ctx, scheduleUntil } = await playing();
+      engine.dispatch({ type: 'drums/setMuted', voice: 'kick', muted: true });
+      expect(engine.getState().drums.kick.muted).toBe(true);
+      expect(engine.getState().appliedMutes.kick).toBe(false);
+
+      scheduleUntil(START_DELAY_S + 4 * step);
+      expect(kickStarts(ctx).some((t) => near(t, START_DELAY_S + 4 * step))).toBe(true);
+      expect(engine.getState().appliedMutes.kick).toBe(false);
+
+      scheduleUntil(nextBar);
+      expect(engine.getState().appliedMutes.kick).toBe(true);
+      expect(kickStarts(ctx).some((t) => near(t, nextBar))).toBe(false);
+      const kickMute = muteGains(ctx)[0];
+      expect(kickMute?.gain.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime', value: 0 });
+      expect(near(kickMute?.gain.calls.at(-1)?.time ?? NaN, nextBar)).toBe(true);
+      expect(ctx.gains[2]?.gain.calls.some((call) => near(call.time, nextBar))).toBe(false);
+    });
+
+    it('un démute en lecture rouvre sur le premier temps de la mesure suivante', async () => {
+      const env = setup();
+      env.engine.dispatch({ type: 'drums/setMuted', voice: 'kick', muted: true });
+      expect(env.engine.getState().appliedMutes.kick).toBe(true);
+      env.engine.dispatch({ type: 'transport/play' });
+      await flush();
+      env.engine.dispatch({ type: 'drums/setMuted', voice: 'kick', muted: false });
+
+      env.ctx.currentTime = START_DELAY_S + 8 * step - 0.05;
+      env.timer.tick();
+      expect(kickStarts(env.ctx)).toEqual([]);
+
+      env.ctx.currentTime = nextBar - 0.05;
+      env.timer.tick();
+      expect(kickStarts(env.ctx).some((t) => near(t, nextBar))).toBe(true);
+      const kickMute = muteGains(env.ctx)[0];
+      expect(kickMute?.gain.calls.at(-1)).toMatchObject({ method: 'setValueAtTime', value: 1 });
+      expect(near(kickMute?.gain.calls.at(-1)?.time ?? NaN, nextBar)).toBe(true);
+    });
+
+    it('deux clics dans la même mesure s’annulent', async () => {
+      const { engine, ctx, scheduleUntil } = await playing();
+      const listener = vi.fn();
+      engine.subscribe(listener);
+      engine.dispatch({ type: 'drums/setMuted', voice: 'kick', muted: true });
+      engine.dispatch({ type: 'drums/setMuted', voice: 'kick', muted: false });
+      listener.mockClear();
+
+      scheduleUntil(nextBar);
+      expect(listener).not.toHaveBeenCalled();
+      expect(kickStarts(ctx).some((t) => near(t, nextBar))).toBe(true);
+      expect(muteGains(ctx)[0]?.gain.calls).toEqual([]);
+    });
+
+    it('stop applique aussitôt un mute en attente', async () => {
+      const { engine, ctx } = await playing();
+      engine.dispatch({ type: 'drums/setMuted', voice: 'clap', muted: true });
+      ctx.currentTime = 0.5;
+      engine.dispatch({ type: 'transport/stop' });
+      expect(engine.getState().appliedMutes.clap).toBe(true);
+      expect(muteGains(ctx)[1]?.gain.calls.at(-1)).toMatchObject({
+        method: 'setTargetAtTime',
+        value: 0,
+      });
+    });
+  });
+
   it('play est idempotent', async () => {
     const { engine, ctx } = setup();
     engine.dispatch({ type: 'transport/play' });
     await flush();
     engine.dispatch({ type: 'transport/play' });
     await flush();
-    expect(ctx.oscillators).toHaveLength(1);
+    expect(persistentOscillators(ctx)).toHaveLength(1);
   });
 
   it('dispose libère le timer et arrête l’oscillateur', async () => {

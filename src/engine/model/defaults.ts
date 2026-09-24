@@ -2,6 +2,7 @@ import type { AudioInfo } from '../audio/context';
 import { BPM_DEFAULT } from './constants';
 import type {
   BassParams,
+  DrumMutes,
   DrumParams,
   DrumPattern,
   EngineState,
@@ -21,11 +22,18 @@ export function tuple16<T>(make: (index: number) => T): Tuple16<T> {
 
 export const DEFAULT_STEP: Step = { note: 0, octave: 0, accent: false, slide: false, rest: false };
 
+const every = (offset: number, period: number, velocity: number) =>
+  tuple16((index) => (index % period === offset ? velocity : 0));
+
+/**
+ * Groove house : kick sur les quatre temps, clap sur 2 et 4, hat ouvert entre
+ * les temps, étouffé par le hat fermé du 16e suivant.
+ */
 export const DEFAULT_DRUM_PATTERN: DrumPattern = {
-  kick: tuple16(() => 0),
-  clap: tuple16(() => 0),
-  closedHat: tuple16(() => 0),
-  openHat: tuple16(() => 0),
+  kick: every(0, 4, 1),
+  clap: every(4, 8, 0.9),
+  closedHat: every(1, 2, 0.6),
+  openHat: every(2, 4, 0.7),
 };
 
 interface LineStep {
@@ -92,6 +100,15 @@ export const DEFAULT_DRUMS: DrumParams = {
   openHat: { level: 0.5, muted: false },
 };
 
+export function mutesOf(drums: DrumParams): DrumMutes {
+  return {
+    kick: drums.kick.muted,
+    clap: drums.clap.muted,
+    closedHat: drums.closedHat.muted,
+    openHat: drums.openHat.muted,
+  };
+}
+
 export const DEFAULT_MIX: MixParams = { bassLevel: 0.8, drumsLevel: 0.7, masterLevel: 0.8 };
 
 export const DEFAULT_GENERATOR: GeneratorParams = {
@@ -112,6 +129,7 @@ export function createInitialState(audio: AudioInfo): EngineState {
     previousPattern: null,
     bass: DEFAULT_BASS,
     drums: DEFAULT_DRUMS,
+    appliedMutes: mutesOf(DEFAULT_DRUMS),
     mix: DEFAULT_MIX,
     generator: DEFAULT_GENERATOR,
   };

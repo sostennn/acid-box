@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FakeAudioContext } from '../../../../tests/fakes/fake-audio-context';
-import { ACCENT_Q_HOLD_S, MIN_GAIN } from '../../model/constants';
+import { ACCENT_Q_HOLD_S, KNOB_SMOOTHING_S, MIN_GAIN } from '../../model/constants';
 import { DEFAULT_BASS, DEFAULT_STEP } from '../../model/defaults';
 import { accentedQ, cutoffToHz, resonanceToQ } from '../../model/mapping';
 import { midiToFrequency } from '../../model/pitch';
@@ -166,7 +166,12 @@ describe('createBassVoice', () => {
     const before = filter?.Q.calls.length ?? 0;
     voice.applyParams({ ...DEFAULT_BASS, resonance: 1 });
     expect(filter?.Q.calls.slice(before)).toEqual([
-      { method: 'setTargetAtTime', time: 2, value: resonanceToQ(1) },
+      {
+        method: 'setTargetAtTime',
+        time: 2,
+        value: resonanceToQ(1),
+        timeConstant: KNOB_SMOOTHING_S,
+      },
     ]);
   });
 

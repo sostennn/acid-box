@@ -4,7 +4,7 @@
  * knobs, sans décider de rien elle-même.
  */
 import type { AudioContextLike } from '../../audio/context';
-import { safeTime, smoothSet } from '../../audio/params';
+import { applyAutomation, safeTime, smoothSet } from '../../audio/params';
 import { KNOB_SMOOTHING_S, MIN_GAIN, STOP_RELEASE_TAU_S } from '../../model/constants';
 import { cutoffToHz, resonanceToQ, tuningToCents } from '../../model/mapping';
 import type { BassParams } from '../../model/types';
@@ -47,21 +47,7 @@ export function createBassVoice(
     vca: vca.gain,
   };
 
-  const apply = (event: ParamEvent) => {
-    const param = params[event.target];
-    const time = safeTime(ctx, event.time);
-    switch (event.kind) {
-      case 'cancel':
-        param.cancelScheduledValues(time);
-        return;
-      case 'set':
-        param.setValueAtTime(event.value, time);
-        return;
-      case 'target':
-        param.setTargetAtTime(event.value, time, event.timeConstant);
-        return;
-    }
-  };
+  const apply = (event: ParamEvent) => applyAutomation(params[event.target], event, ctx);
 
   // Le plan fige la résonance du knob dans le retour de Q d'un accent. Un geste
   // fait entre la programmation de l'accent et ce retour doit l'emporter : la

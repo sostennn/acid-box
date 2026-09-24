@@ -1,7 +1,7 @@
 /**
  * Action Svelte du geste de knob : Pointer Events avec capture, souris et
- * tactile, drag relatif combiné, mode fin avec Shift, double-tap = valeur par
- * défaut, clavier. Ne calcule rien : délègue à knob-math.
+ * tactile, drag relatif combiné, mode fin avec Shift, tap, double-tap = valeur
+ * par défaut, clavier. Ne calcule rien : délègue à knob-math.
  */
 import type { Action } from 'svelte/action';
 import { KNOB_DOUBLE_TAP_MS, KNOB_TAP_SLOP_PX, valueFromDrag, valueFromKey } from './knob-math';
@@ -11,6 +11,8 @@ export interface KnobDragParams {
   readonly getValue: () => number;
   readonly onchange: (value: number) => void;
   readonly ondefault?: () => void;
+  /** Appui sans déplacement, à chaque tap (une case de grille bascule ainsi). */
+  readonly ontap?: () => void;
 }
 
 export const knobDrag: Action<HTMLElement, KnobDragParams> = (node, params) => {
@@ -49,6 +51,7 @@ export const knobDrag: Action<HTMLElement, KnobDragParams> = (node, params) => {
       lastTapAt = 0;
       return;
     }
+    current.ontap?.();
     const now = event.timeStamp;
     if (now - lastTapAt < KNOB_DOUBLE_TAP_MS) {
       lastTapAt = 0;

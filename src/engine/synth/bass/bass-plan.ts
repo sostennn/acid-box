@@ -8,6 +8,7 @@
  * courante du paramètre, quel qu'il soit, donc jamais de clic ni de problème
  * de rampe exponentielle depuis zéro.
  */
+import type { AutomationEvent } from '../../audio/params';
 import {
   ACCENT_ENV_DECAY_S,
   ACCENT_MAX_GAIN_BOOST,
@@ -26,21 +27,7 @@ import type { BassParams, Step } from '../../model/types';
 
 export type ParamTarget = 'frequency' | 'filterDetune' | 'filterQ' | 'vca';
 
-export type ParamEvent =
-  | { readonly target: ParamTarget; readonly kind: 'cancel'; readonly time: number }
-  | {
-      readonly target: ParamTarget;
-      readonly kind: 'set';
-      readonly time: number;
-      readonly value: number;
-    }
-  | {
-      readonly target: ParamTarget;
-      readonly kind: 'target';
-      readonly time: number;
-      readonly value: number;
-      readonly timeConstant: number;
-    };
+export type ParamEvent = AutomationEvent & { readonly target: ParamTarget };
 
 export interface StepPlanInput {
   readonly step: Step;

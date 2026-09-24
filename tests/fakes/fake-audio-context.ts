@@ -6,8 +6,11 @@ import type { AudioContextLike } from '@engine/audio/context';
 
 export interface ParamCall {
   readonly method: string;
-  readonly value: number;
+  /** Absente pour `cancelScheduledValues`. */
+  readonly value?: number;
   readonly time: number;
+  /** Présente pour `setTargetAtTime`. */
+  readonly timeConstant?: number;
 }
 
 export class FakeAudioParam {
@@ -30,13 +33,13 @@ export class FakeAudioParam {
     return this;
   }
 
-  setTargetAtTime(value: number, time: number) {
-    this.calls.push({ method: 'setTargetAtTime', value, time });
+  setTargetAtTime(value: number, time: number, timeConstant: number) {
+    this.calls.push({ method: 'setTargetAtTime', value, time, timeConstant });
     return this;
   }
 
   cancelScheduledValues(time: number) {
-    this.calls.push({ method: 'cancelScheduledValues', value: NaN, time });
+    this.calls.push({ method: 'cancelScheduledValues', time });
     return this;
   }
 }
@@ -77,8 +80,14 @@ export class FakeSourceNode extends FakeNode {
     this.startedAt = when;
   }
 
+  /** Le dernier appel l'emporte, comme dans Web Audio. */
   stop(when = 0) {
     this.stoppedAt = when;
+  }
+
+  /** Simule la fin de lecture, que Web Audio signale après `stop`. */
+  end() {
+    this.emit('ended');
   }
 }
 
@@ -90,6 +99,25 @@ export class FakeOscillatorNode extends FakeSourceNode {
 
 export class FakeBufferSourceNode extends FakeSourceNode {
   buffer: unknown = null;
+  loop = false;
+}
+
+export class FakeAudioBuffer {
+  private readonly channels: Float32Array[];
+
+  constructor(
+    readonly numberOfChannels: number,
+    readonly length: number,
+    readonly sampleRate: number,
+  ) {
+    this.channels = Array.from({ length: numberOfChannels }, () => new Float32Array(length));
+  }
+
+  getChannelData(channel: number) {
+    const data = this.channels[channel];
+    if (data === undefined) throw new RangeError(`no channel ${channel}`);
+    return data;
+  }
 }
 
 export class FakeGainNode extends FakeNode {
@@ -136,8 +164,12 @@ export class FakeAudioContext extends FakeNode {
     this.setState('closed');
   }
 
+  readonly buffers: FakeAudioBuffer[] = [];
+
   createBuffer(channels: number, length: number, sampleRate: number) {
-    return { channels, length, sampleRate };
+    const buffer = new FakeAudioBuffer(channels, length, sampleRate);
+    this.buffers.push(buffer);
+    return buffer;
   }
 
   createBufferSource() {

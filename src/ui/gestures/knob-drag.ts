@@ -11,8 +11,12 @@ export interface KnobDragParams {
   readonly getValue: () => number;
   readonly onchange: (value: number) => void;
   readonly ondefault?: () => void;
-  /** Appui sans déplacement, à chaque tap (une case de grille bascule ainsi). */
-  readonly ontap?: () => void;
+  /**
+   * Appui sans déplacement, à chaque tap (une case de grille bascule ainsi).
+   * Reçoit la valeur lue à l'appui : un tremblement sous le seuil de tap a pu
+   * déjà la modifier, la bascule doit se décider d'après l'état de départ.
+   */
+  readonly ontap?: (startValue: number) => void;
 }
 
 export const knobDrag: Action<HTMLElement, KnobDragParams> = (node, params) => {
@@ -21,6 +25,7 @@ export const knobDrag: Action<HTMLElement, KnobDragParams> = (node, params) => {
   let lastX = 0;
   let lastY = 0;
   let moved = 0;
+  let startValue = 0;
   let lastTapAt = 0;
 
   const onPointerDown = (event: PointerEvent) => {
@@ -29,6 +34,7 @@ export const knobDrag: Action<HTMLElement, KnobDragParams> = (node, params) => {
     lastX = event.clientX;
     lastY = event.clientY;
     moved = 0;
+    startValue = current.getValue();
     if (typeof node.setPointerCapture === 'function') node.setPointerCapture(pointerId);
     node.focus({ preventScroll: true });
     event.preventDefault();
@@ -44,14 +50,14 @@ export const knobDrag: Action<HTMLElement, KnobDragParams> = (node, params) => {
     current.onchange(valueFromDrag(current.getValue(), dx, dy, event.shiftKey));
   };
 
-  const onPointerEnd = (event: PointerEvent) => {
+  const onPointerUp = (event: PointerEvent) => {
     if (event.pointerId !== pointerId) return;
     pointerId = null;
     if (moved > KNOB_TAP_SLOP_PX) {
       lastTapAt = 0;
       return;
     }
-    current.ontap?.();
+    current.ontap?.(startValue);
     const now = event.timeStamp;
     if (now - lastTapAt < KNOB_DOUBLE_TAP_MS) {
       lastTapAt = 0;
@@ -59,6 +65,13 @@ export const knobDrag: Action<HTMLElement, KnobDragParams> = (node, params) => {
     } else {
       lastTapAt = now;
     }
+  };
+
+  // Un appui annulé par le système n'est ni un tap ni la moitié d'un double-tap.
+  const onPointerCancel = (event: PointerEvent) => {
+    if (event.pointerId !== pointerId) return;
+    pointerId = null;
+    lastTapAt = 0;
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -71,8 +84,8 @@ export const knobDrag: Action<HTMLElement, KnobDragParams> = (node, params) => {
   node.style.touchAction = 'none';
   node.addEventListener('pointerdown', onPointerDown);
   node.addEventListener('pointermove', onPointerMove);
-  node.addEventListener('pointerup', onPointerEnd);
-  node.addEventListener('pointercancel', onPointerEnd);
+  node.addEventListener('pointerup', onPointerUp);
+  node.addEventListener('pointercancel', onPointerCancel);
   node.addEventListener('keydown', onKeyDown);
 
   return {
@@ -82,8 +95,8 @@ export const knobDrag: Action<HTMLElement, KnobDragParams> = (node, params) => {
     destroy() {
       node.removeEventListener('pointerdown', onPointerDown);
       node.removeEventListener('pointermove', onPointerMove);
-      node.removeEventListener('pointerup', onPointerEnd);
-      node.removeEventListener('pointercancel', onPointerEnd);
+      node.removeEventListener('pointerup', onPointerUp);
+      node.removeEventListener('pointercancel', onPointerCancel);
       node.removeEventListener('keydown', onKeyDown);
     },
   };

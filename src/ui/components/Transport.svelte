@@ -10,6 +10,7 @@
   } from '@engine';
   import Knob from './Knob.svelte';
   import Switch from './Switch.svelte';
+  import { formatPercent } from '../format';
 
   interface Props {
     transport: TransportState;
@@ -23,7 +24,6 @@
   const bpmToNormalized = (bpm: number) => (bpm - BPM_MIN) / (BPM_MAX - BPM_MIN);
   const normalizedToBpm = (value: number) => Math.round(BPM_MIN + value * (BPM_MAX - BPM_MIN));
 
-  const percent = (value: number) => `${Math.round(value * 100)} %`;
   const setMix = (key: keyof MixParams) => (value: number) =>
     dispatch({ type: 'mix/set', patch: { [key]: value } });
 
@@ -68,7 +68,7 @@
       label="Amount"
       value={transport.sidechain.amount}
       defaultValue={DEFAULT_TRANSPORT.sidechain.amount}
-      format={percent}
+      format={formatPercent}
       onchange={(amount) => dispatch({ type: 'transport/setSidechain', patch: { amount } })}
     />
   </div>
@@ -78,21 +78,21 @@
       label="Basse"
       value={mix.bassLevel}
       defaultValue={DEFAULT_MIX.bassLevel}
-      format={percent}
+      format={formatPercent}
       onchange={setMix('bassLevel')}
     />
     <Knob
       label="Rythmique"
       value={mix.drumsLevel}
       defaultValue={DEFAULT_MIX.drumsLevel}
-      format={percent}
+      format={formatPercent}
       onchange={setMix('drumsLevel')}
     />
     <Knob
       label="Master"
       value={mix.masterLevel}
       defaultValue={DEFAULT_MIX.masterLevel}
-      format={percent}
+      format={formatPercent}
       onchange={setMix('masterLevel')}
     />
   </div>

@@ -9,6 +9,7 @@
   import { DRUM_LABELS } from './drum-labels';
   import Knob from './Knob.svelte';
   import Switch from './Switch.svelte';
+  import { formatPercent } from '../format';
 
   interface Props {
     drums: DrumParams;
@@ -18,8 +19,6 @@
   }
 
   const { drums, appliedMutes, dispatch }: Props = $props();
-
-  const percent = (value: number) => `${Math.round(value * 100)} %`;
 </script>
 
 <div class="panel">
@@ -30,7 +29,7 @@
         label="Niveau"
         value={drums[voice].level}
         defaultValue={DEFAULT_DRUMS[voice].level}
-        format={percent}
+        format={formatPercent}
         onchange={(value) => dispatch({ type: 'drums/setLevel', voice, value })}
       />
       <Switch

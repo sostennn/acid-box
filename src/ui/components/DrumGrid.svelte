@@ -7,6 +7,7 @@
     type DrumVoiceId,
     type StepIndex,
   } from '@engine';
+  import { toPercent } from '../format';
   import { knobDrag } from '../gestures/knob-drag';
   import { DRUM_LABELS } from './drum-labels';
   import PlayheadStrip from './PlayheadStrip.svelte';
@@ -22,16 +23,16 @@
   const setVelocity = (voice: DrumVoiceId, index: StepIndex, velocity: number) =>
     dispatch({ type: 'pattern/setDrumVelocity', voice, index, velocity });
 
-  const toggle = (voice: DrumVoiceId, index: StepIndex) =>
-    setVelocity(voice, index, pattern[voice][index] > 0 ? 0 : DRUM_DEFAULT_VELOCITY);
+  const toggle = (voice: DrumVoiceId, index: StepIndex, velocity: number) =>
+    setVelocity(voice, index, velocity > 0 ? 0 : DRUM_DEFAULT_VELOCITY);
 
+  // Entrée seulement : l'espace reste le raccourci play / stop, même quand une
+  // case a pris le focus au clic.
   const onKeydown = (voice: DrumVoiceId, index: StepIndex) => (event: KeyboardEvent) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.key !== 'Enter' || event.repeat) return;
     event.preventDefault();
-    toggle(voice, index);
+    toggle(voice, index, pattern[voice][index]);
   };
-
-  const percent = (velocity: number) => Math.round(velocity * 100);
 </script>
 
 <div class="drums">
@@ -53,13 +54,13 @@
           aria-label={`${DRUM_LABELS[voice]}, pas ${index + 1}`}
           aria-valuemin="0"
           aria-valuemax="100"
-          aria-valuenow={percent(velocity)}
-          aria-valuetext={velocity > 0 ? `vélocité ${percent(velocity)} %` : 'inactif'}
+          aria-valuenow={toPercent(velocity)}
+          aria-valuetext={velocity > 0 ? `vélocité ${toPercent(velocity)} %` : 'inactif'}
           onkeydown={onKeydown(voice, index)}
           use:knobDrag={{
             getValue: () => velocity,
             onchange: (value) => setVelocity(voice, index, value),
-            ontap: () => toggle(voice, index),
+            ontap: (startValue) => toggle(voice, index, startValue),
           }}
         >
           <span class="fill" aria-hidden="true"></span>
@@ -99,7 +100,6 @@
     cursor: ns-resize;
     user-select: none;
     outline: none;
-    transition: box-shadow var(--duration-fast) var(--easing);
   }
 
   .cell.beat {

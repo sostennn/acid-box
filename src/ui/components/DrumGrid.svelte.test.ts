@@ -90,6 +90,37 @@ describe('DrumGrid', () => {
     expect(dispatch.mock.lastCall?.[0].velocity).toBeCloseTo(0.99, 10);
   });
 
+  it('un glissé en petits mouvements règle la vélocité sans basculer le pas', async () => {
+    const { dispatch, getByRole } = setup();
+    const cell = getByRole('slider', { name: 'Clap, pas 1' });
+    await fireEvent(
+      cell,
+      new PointerEvent('pointerdown', { pointerId: 1, clientX: 0, clientY: 0 }),
+    );
+    for (let y = -2; y >= -20; y -= 2) {
+      await fireEvent(
+        cell,
+        new PointerEvent('pointermove', { pointerId: 1, clientX: 0, clientY: y }),
+      );
+    }
+    await fireEvent(
+      cell,
+      new PointerEvent('pointerup', { pointerId: 1, clientX: 0, clientY: -20 }),
+    );
+    expect(
+      dispatch.mock.calls.every(([command]) => command.velocity !== DRUM_DEFAULT_VELOCITY),
+    ).toBe(true);
+    expect(dispatch.mock.lastCall?.[0]).toMatchObject({ voice: 'clap', index: 0 });
+  });
+
+  it('l’espace reste au transport et Entrée maintenue ne répète pas', async () => {
+    const { dispatch, getByRole } = setup();
+    const cell = getByRole('slider', { name: 'Clap, pas 2' });
+    await fireEvent.keyDown(cell, { key: ' ' });
+    await fireEvent.keyDown(cell, { key: 'Enter', repeat: true });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
   it('suit la tête de lecture', () => {
     const { getByRole } = setup(4);
     expect(getByRole('slider', { name: 'Clap, pas 5' }).classList.contains('active')).toBe(true);

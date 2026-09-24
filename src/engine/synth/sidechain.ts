@@ -54,7 +54,10 @@ export function createSidechain(ctx: AudioContextLike): Sidechain {
   return {
     node,
     duck(input) {
-      planDuck(input).forEach((event) => applyAutomation(node.gain, event, ctx));
+      // Décaler tout le plan d'un bloc : repoussés un à un par `safeTime`, la
+      // plongée et la remontée d'un pas très en retard tomberaient ensemble.
+      const time = safeTime(ctx, input.time);
+      planDuck({ ...input, time }).forEach((event) => applyAutomation(node.gain, event, ctx));
     },
     applyParams(params) {
       if (!params.enabled) restore(ctx.currentTime);

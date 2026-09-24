@@ -60,16 +60,21 @@ export function createDrumKit(
   initialMutes: DrumMutes,
 ): DrumKit {
   const noise = createNoiseBuffer(ctx);
-  const channels = {} as Record<DrumVoiceId, Channel>;
-  for (const voice of DRUM_VOICES) {
+  const createChannel = (voice: DrumVoiceId): Channel => {
     const level = ctx.createGain();
     const mute = ctx.createGain();
     level.gain.value = levelToGain(levels[voice].level);
     mute.gain.value = initialMutes[voice] ? 0 : 1;
     level.connect(mute);
     mute.connect(output);
-    channels[voice] = { level, mute };
-  }
+    return { level, mute };
+  };
+  const channels: Readonly<Record<DrumVoiceId, Channel>> = {
+    kick: createChannel('kick'),
+    clap: createChannel('clap'),
+    closedHat: createChannel('closedHat'),
+    openHat: createChannel('openHat'),
+  };
   let mutes = initialMutes;
 
   // Frappes qui sonnent encore ou sont déjà programmées, retirées à `ended`.

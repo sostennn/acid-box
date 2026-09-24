@@ -74,6 +74,16 @@ describe('createSidechain', () => {
     ]);
   });
 
+  it('un kick en retard décale tout le plan, maintien compris', () => {
+    const ctx = new FakeAudioContext();
+    const sidechain = createSidechain(ctx.asContext());
+    ctx.currentTime = 5;
+    sidechain.duck(duck({ time: 4.9 }));
+    const [, dip, rise] = ctx.gains[0]?.gain.calls ?? [];
+    expect(dip?.time).toBe(5 + SCHEDULE_EPSILON_S);
+    expect(rise?.time).toBeCloseTo(5 + SCHEDULE_EPSILON_S + SIDECHAIN_HOLD_S, 10);
+  });
+
   it('désactivé en plein ducking, la basse remonte aussitôt ; activé, rien ne bouge', () => {
     const ctx = new FakeAudioContext();
     const sidechain = createSidechain(ctx.asContext());

@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FakeAudioContext, createFakeVisibility } from '../../tests/fakes/fake-audio-context';
+import {
+  FakeAudioContext,
+  createFakeVisibility,
+  findVca,
+} from '../../tests/fakes/fake-audio-context';
 import { FakeTimer } from '../../tests/fakes/fake-clock';
 import { createEngine } from './index';
 import { BPM_DEFAULT, MIN_GAIN, SIDECHAIN_MAX_DEPTH, START_DELAY_S } from './model/constants';
@@ -35,10 +39,6 @@ const muteGains = (ctx: FakeAudioContext, drums = ctx.gains[3]) =>
   ctx.gains.filter((gain) => drums !== undefined && gain.connections.includes(drums));
 
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
-
-/** Le VCA est le gain branché en sortie du filtre de la voix basse. */
-const findVca = (ctx: FakeAudioContext) =>
-  ctx.gains.find((gain) => ctx.filters[0]?.connections.includes(gain));
 
 describe('createEngine', () => {
   it('expose l’état audio et notifie les abonnés', async () => {

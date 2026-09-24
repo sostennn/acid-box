@@ -235,3 +235,8 @@ export function createFakeVisibility(): FakeVisibility {
     },
   };
 }
+
+/** Le VCA de la voix basse est le gain branché en sortie de son filtre. */
+export function findVca(ctx: FakeAudioContext): FakeGainNode | undefined {
+  return ctx.gains.find((gain) => ctx.filters[0]?.connections.includes(gain));
+}

@@ -175,10 +175,9 @@ moteur recopiée dans un composant est un finding du domaine interface, sourcé 
 
 ## Étape 3 — Evidence
 
-**Mode local** : exécuter `pnpm verify` (typecheck, lint, stylelint, tests) et lire la
-sortie. Échec : `[Bloquant — Evidence]` avec l'extrait de sortie, puis continuer la revue
-sans corriger. Si la PR touche `vite.config.ts`, un worker ou la CI, exécuter aussi
-`pnpm build`.
+**Mode local** : exécuter `pnpm verify` (typecheck, lint, stylelint, tests, build) et lire
+la sortie. Échec : `[Bloquant — Evidence]` avec l'extrait de sortie, puis continuer la
+revue sans corriger.
 
 **Mode PR** : lire `statusCheckRollup`. Le check s'appelle `verify`.
 

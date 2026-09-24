@@ -582,7 +582,6 @@ fichier.
 **Dette**
 
 - README : la liste « À écouter à chaque lot » ne couvre que les lots 0 et 5, alors que §6.5 promet une checklist par lot ; celles des lots 1 à 4 vivent dans les descriptions de PR.
-- `main` n'est pas protégée et `pnpm verify` ne lance pas `pnpm build`, que seule la CI exécute.
 
 **Points ouverts**
 

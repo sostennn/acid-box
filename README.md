@@ -14,7 +14,7 @@ pnpm install
 pnpm dev
 ```
 
-Vérifications (typecheck, lint, stylelint, tests) :
+Vérifications (typecheck, lint, stylelint, tests, build) :
 
 ```bash
 pnpm verify

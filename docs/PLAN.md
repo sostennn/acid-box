@@ -583,7 +583,7 @@ fichier.
 
 **Dette**
 
-Aucune dette connue.
+- `main` n'est pas protégée : ni PR obligatoire ni check `verify` requis avant merge.
 
 **Points ouverts**
 

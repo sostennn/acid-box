@@ -128,3 +128,18 @@ export interface PlayheadEvent {
   /** Temps AudioContext auquel le pas est programmé. */
   readonly time: number;
 }
+
+/* ---------- Persistance ---------- */
+/**
+ * État de travail sauvegardé : ce que l'utilisateur a réglé, sans l'état
+ * audio, le statut de lecture, les mutes entendus ni l'undo du générateur.
+ */
+export interface PersistedStateV1 {
+  readonly version: 1;
+  readonly pattern: Pattern;
+  readonly bass: BassParams;
+  readonly drums: DrumParams;
+  readonly mix: MixParams;
+  readonly transport: TransportParams;
+  readonly generator: GeneratorParams;
+}

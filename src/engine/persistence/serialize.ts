@@ -51,7 +51,10 @@ export function restoreState(json: string | null, audio: AudioInfo): EngineState
   return commandsFor(persisted).reduce((state, command) => reduce(state, command), initial);
 }
 
-/** Vrai si une partie sauvegardée a changé : l'état audio, le statut de lecture et l'undo n'en sont pas. */
+/**
+ * Vrai si une partie sauvegardée a changé : l'état audio, le statut de lecture et l'undo n'en sont pas.
+ * À tenir aligné sur `PersistedStateV1` : un champ oublié ici ne déclenche aucune sauvegarde.
+ */
 export function persistedChanged(previous: EngineState, next: EngineState): boolean {
   return (
     previous.pattern !== next.pattern ||

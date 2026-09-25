@@ -3,6 +3,8 @@
   import AudioGate from './components/AudioGate.svelte';
   import BassPanel from './components/BassPanel.svelte';
   import BassSequencer from './components/BassSequencer.svelte';
+  import DrumGrid from './components/DrumGrid.svelte';
+  import DrumPanel from './components/DrumPanel.svelte';
   import Transport from './components/Transport.svelte';
   import { createPlayhead } from './playhead/playhead.svelte';
   import { createEngineStore } from './state/engine.svelte';
@@ -59,6 +61,19 @@
         dispatch={engine.dispatch}
       />
     </section>
+
+    <section class="panel drums">
+      <DrumPanel
+        drums={engine.state.drums}
+        appliedMutes={engine.state.appliedMutes}
+        dispatch={engine.dispatch}
+      />
+      <DrumGrid
+        pattern={engine.state.pattern.drums}
+        activeStep={playhead.step}
+        dispatch={engine.dispatch}
+      />
+    </section>
   </main>
 {/if}
 
@@ -99,5 +114,11 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     background: var(--color-surface);
+  }
+
+  .drums {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
   }
 </style>

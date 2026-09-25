@@ -92,7 +92,6 @@
     padding: var(--space-1);
     border-radius: var(--radius-md);
     background: var(--step-cell-bg);
-    transition: box-shadow var(--duration-fast) var(--easing);
   }
 
   .cell.active {

@@ -10,6 +10,7 @@
     type Command,
   } from '@engine';
   import Knob from './Knob.svelte';
+  import { formatPercent } from '../format';
 
   interface Props {
     bass: BassParams;
@@ -21,7 +22,6 @@
   const set = (knob: BassKnobId) => (value: number) =>
     dispatch({ type: 'bass/setKnob', knob, value });
 
-  const percent = (value: number) => `${Math.round(value * 100)} %`;
   const hertz = (value: number) => {
     const hz = cutoffToHz(value);
     return hz >= 1000 ? `${(hz / 1000).toFixed(1)} kHz` : `${Math.round(hz)} Hz`;
@@ -78,7 +78,7 @@
       label="Env mod"
       value={bass.envMod}
       defaultValue={DEFAULT_BASS.envMod}
-      format={percent}
+      format={formatPercent}
       onchange={set('envMod')}
     />
     <Knob
@@ -92,14 +92,14 @@
       label="Accent"
       value={bass.accent}
       defaultValue={DEFAULT_BASS.accent}
-      format={percent}
+      format={formatPercent}
       onchange={set('accent')}
     />
     <Knob
       label="Drive"
       value={bass.drive}
       defaultValue={DEFAULT_BASS.drive}
-      format={percent}
+      format={formatPercent}
       onchange={set('drive')}
     />
   </div>

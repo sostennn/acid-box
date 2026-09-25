@@ -87,3 +87,49 @@ export const DRIVE_MAKEUP_EXPONENT = 0.25;
 /** Raideur de la courbe tanh du WaveShaper. */
 export const DRIVE_CURVE_STEEPNESS = 1.5;
 export const DRIVE_CURVE_SAMPLES = 2048;
+
+/* ---------- Rythmique ---------- */
+/* Timbres fixés par constantes : pas de knob de timbre en v1. */
+/** Vélocité posée par un tap sur un pas vide de la grille. */
+export const DRUM_DEFAULT_VELOCITY = 0.8;
+/** À vélocité minimale, la queue d'une frappe dure (1 − spread) fois sa durée nominale. */
+export const DRUM_VELOCITY_DECAY_SPREAD = 0.3;
+/** Une frappe s'arrête après ce nombre de constantes de temps de sa queue (5τ ≈ −43 dB). */
+export const DRUM_TAIL_TAUS = 5;
+/** Coupure d'une frappe qui sonne encore (stop, étouffement du hat ouvert), sans clic. */
+export const DRUM_CUT_TAU_S = 0.004;
+/** Durée du buffer de bruit, lu en boucle. */
+export const NOISE_BUFFER_S = 1;
+
+/** Kick : sinus dont la hauteur plonge de START à END. */
+export const KICK_PITCH_START_HZ = 160;
+export const KICK_PITCH_END_HZ = 48;
+export const KICK_PITCH_TAU_S = 0.025;
+export const KICK_DECAY_TAU_S = 0.12;
+
+/** Clap : rafale de courtes bouffées de bruit filtré, puis une queue. */
+export const CLAP_FILTER_HZ = 1200;
+/** Q d'un passe-bande, sans unité (et non en dB comme celui d'un passe-bas). */
+export const CLAP_FILTER_Q = 1.5;
+export const CLAP_BURST_COUNT = 3;
+export const CLAP_BURST_INTERVAL_S = 0.01;
+export const CLAP_BURST_TAU_S = 0.003;
+export const CLAP_TAIL_TAU_S = 0.08;
+
+/** Hats : bruit passe-haut, seul le decay distingue le fermé de l'ouvert. */
+export const HAT_HIGHPASS_HZ = 7000;
+export const CLOSED_HAT_DECAY_TAU_S = 0.02;
+export const OPEN_HAT_DECAY_TAU_S = 0.18;
+
+/* ---------- Sidechain ---------- */
+/** À amount = 1, le bus basse descend à 10 % de son niveau (−20 dB) sous le kick. */
+export const SIDECHAIN_MAX_DEPTH = 0.9;
+/** Constantes de temps (`setTargetAtTime`) de la plongée et de la remontée. */
+export const SIDECHAIN_ATTACK_S = 0.004;
+export const SIDECHAIN_RELEASE_S = 0.08;
+/**
+ * Maintien au creux avant la remontée. Doit rester sous le plus court créneau
+ * entre deux pas, `D·(1 − SHUFFLE_MAX_RATIO)` à `BPM_MAX` (31 ms) : le kick
+ * suivant annule tout ce qui est programmé après lui.
+ */
+export const SIDECHAIN_HOLD_S = 0.02;

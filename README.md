@@ -58,7 +58,7 @@ Le plan détaillé est dans [docs/PLAN.md](docs/PLAN.md).
 | 2   | Le knob et le geste                          | fait |
 | 3   | La voix basse                                | fait |
 | 4   | Accent et slide                              | fait |
-| 5   | Rythmique et sidechain                       |      |
+| 5   | Rythmique et sidechain                       | fait |
 | 6   | Générateur de patterns                       |      |
 | 7   | Persistance, robustesse, finition            |      |
 
@@ -67,6 +67,7 @@ patterns et enregistrement (v3), export WAV, partage par URL et Web MIDI (v4).
 
 ## À écouter à chaque lot
 
-- Pas de clic à l'arrêt ni au changement de forme d'onde.
+- Pas de clic à l'arrêt ni au changement de forme d'onde ; aucune frappe ne part après le stop.
+- Un mute ou un démute en lecture tombe sur le premier temps de la mesure suivante, sans clic ; l'interrupteur clignote en attendant.
 - Pas de bruit de « zipper » quand on tourne un knob.
 - Le curseur visuel tombe sur le pas que l'on entend, à 60 comme à 240 BPM.

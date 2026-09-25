@@ -62,6 +62,7 @@ export interface DrumVoiceParams {
   readonly muted: boolean;
 }
 export type DrumParams = Readonly<Record<DrumVoiceId, DrumVoiceParams>>;
+export type DrumMutes = Readonly<Record<DrumVoiceId, boolean>>;
 
 export interface MixParams {
   readonly bassLevel: Normalized;
@@ -109,7 +110,10 @@ export interface EngineState {
   /** Undo à un niveau du générateur. */
   readonly previousPattern: Pattern | null;
   readonly bass: BassParams;
+  /** `muted` y est le mute demandé ; en lecture, il ne s'entend qu'à la mesure suivante. */
   readonly drums: DrumParams;
+  /** Mute réellement appliqué : rejoint `drums` au pas 0 en lecture, aussitôt à l'arrêt. */
+  readonly appliedMutes: DrumMutes;
   readonly mix: MixParams;
   readonly generator: GeneratorParams;
 }

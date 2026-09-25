@@ -8,7 +8,7 @@ Projet personnel destiné à GitHub : un synthétiseur basse monophonique de typ
 est le synthé basse et le plaisir de le jouer en direct au knob. La qualité du
 code est un objectif au même titre que le résultat sonore.
 
-Ce document planifie la **v1** en détail et esquisse v2–v4. Les lots 0 à 4 sont
+Ce document planifie la **v1** en détail et esquisse v2–v4. Les lots 0 à 5 sont
 livrés (état dans la feuille de route du README). Quand le code s'écarte de ce
 plan, c'est le code qui fait foi et ce document est corrigé dans la même PR ;
 les écarts pas encore traités sont listés dans « Dette et points ouverts », à la
@@ -106,12 +106,14 @@ acid-box/
 │   │   │   │   ├── bass-voice.ts   # applique le plan aux AudioParams
 │   │   │   │   └── drive.ts        # pré-gain + WaveShaper tanh
 │   │   │   ├── drums/
+│   │   │   │   ├── drum-kit.ts     # tranches par voix, frappes qui sonnent, choke, release
+│   │   │   │   ├── hit.ts          # cycle de vie d'une frappe (start, stop, ended, cut)
 │   │   │   │   ├── noise.ts        # buffer de bruit blanc généré procéduralement
 │   │   │   │   ├── kick.ts
 │   │   │   │   ├── clap.ts
 │   │   │   │   ├── hihat.ts        # closed + open, choke group
 │   │   │   │   └── drum-plan.ts    # vélocité → paramètres de frappe (pur)
-│   │   │   └── sidechain.ts        # ducking programmé sur le bus basse
+│   │   │   └── sidechain.ts        # gain dédié bus basse → master, ducking programmé
 │   │   ├── generator/
 │   │   │   ├── rng.ts              # PRNG seedable (mulberry32 ou équivalent)
 │   │   │   └── acid-generator.ts   # génération contrainte (pur, testé)
@@ -228,6 +230,7 @@ export interface DrumVoiceParams {
   readonly muted: boolean;
 }
 export type DrumParams = Readonly<Record<DrumVoiceId, DrumVoiceParams>>;
+export type DrumMutes = Readonly<Record<DrumVoiceId, boolean>>;
 
 export interface MixParams {
   readonly bassLevel: Normalized;
@@ -278,7 +281,8 @@ export interface EngineState {
   readonly pattern: Pattern;
   readonly previousPattern: Pattern | null; // undo à un niveau du générateur
   readonly bass: BassParams;
-  readonly drums: DrumParams;
+  readonly drums: DrumParams; // muted = mute demandé
+  readonly appliedMutes: DrumMutes; // mute entendu : rejoint drums au pas 0 en lecture, aussitôt à l'arrêt
   readonly mix: MixParams;
   readonly generator: GeneratorParams;
 }
@@ -423,6 +427,13 @@ verte, et fait l'objet d'un ou plusieurs commits (sur demande). Difficulté :
 - Nœuds source créés **par frappe** et arrêtés à `t + durée`.
 - `sidechain.ts` : GainNode sur le bus basse, automation programmée à chaque kick non muté (`SIDECHAIN_ATTACK_S`, `SIDECHAIN_RELEASE_S`, profondeur = amount).
 - `DrumGrid.svelte`, `DrumPanel.svelte` (mute, niveau), interrupteur + knob sidechain dans le transport, `mix` (basse, rythmique, master).
+- Décisions prises à l'implémentation :
+  - **Les frappes qui sonnent sont suivies par le kit** jusqu'à `ended`, puis oubliées. Sans ce registre, une frappe déjà programmée dans la fenêtre de lookahead partirait après le stop, et le choke ne saurait pas quel hat ouvert couper. Le stop coupe tout par une constante de temps courte (`DRUM_CUT_TAU_S`) ; une frappe pas encore partie est arrêtée avant son départ et ne sonne pas.
+  - **Le choke se décide d'après ce qui sonne**, comme la liaison au lot 4 : toute frappe de hat, fermé ou ouvert, coupe les hats ouverts du registre.
+  - **Niveau et mute par voix sur une tranche persistante de deux gains** : le niveau, lissé et immédiat, agit sur la queue en cours ; le mute a son propre gain, pour qu'un knob tourné pendant qu'un mute attend la mesure ne l'avance jamais. Une voix mutée ne crée en plus aucun nœud.
+  - **Un mute ou un démute en lecture attend le début de la mesure suivante** (retour d'écoute). L'état distingue le mute demandé (`drums[v].muted`) du mute entendu (`appliedMutes`) ; au pas 0, le moteur recopie l'un dans l'autre et programme le gain de mute au temps de ce pas. Le mute coupe les queues par `DRUM_CUT_TAU_S`, le démute saute à 1 pour garder l'attaque du temps (la tranche mutée est silencieuse). À l'arrêt, le mute est immédiat. L'interrupteur clignote tant que les deux diffèrent ; le clignotement s'arrête quand le pas 0 est programmé, jusqu'à une fenêtre de lookahead plus la latence de sortie avant de l'entendre.
+  - **Le sidechain est un gain dédié entre le bus basse et le master**, séparé du niveau de mix de la basse : le knob et le ducking n'écrivent jamais sur le même AudioParam. La remontée est posée `SIDECHAIN_HOLD_S` après le kick, sous le plus court créneau entre deux pas, et le kick suivant l'annule par un `cancel`.
+- Groove house par défaut (`defaults.ts`) : kick sur les temps, clap sur 2 et 4, hat ouvert entre les temps, étouffé par le hat fermé suivant.
 - **On entend** : le groove complet, la basse qui « pompe » sous le kick.
 
 ### Lot 6 — Générateur de patterns ★★
@@ -514,7 +525,7 @@ ce qui est logique** le soit.
 | **AudioContext bloqué avant interaction** (autoplay policy)                                                                                                                                         | Création **paresseuse** de l'AudioContext dans un gestionnaire de geste (`pointerup`/`click`, pas `pointermove`), `await resume()`, et sur iOS lecture d'un buffer silencieux d'un échantillon pour « ouvrir » la sortie. `AudioGate.svelte` masque l'app tant que `availability !== 'running'`. Toute commande `transport/play` reçue avant déblocage appelle `unlock()` d'abord.                                                                                                                                            |
 | **iOS / Safari** : contexte passé en `interrupted` (appel, Siri, verrouillage), sampleRate 48 kHz vs 44,1 kHz, `outputLatency` absent, timers throttlés en arrière-plan, scroll qui capture le drag | Écouter `statechange` et `visibilitychange`, retenter `resume()` au retour au premier plan, exposer l'état dans `AudioInfo` pour que l'UI affiche « tap pour reprendre ». Ne jamais coder en dur la fréquence d'échantillonnage. `outputLatency ?? baseLatency ?? 0`. `touch-action: none` + `setPointerCapture` sur les knobs et cellules. Passe de test réelle sur iPad au lot 7. Le bouton silencieux matériel coupant Web Audio sur d'anciennes versions est documenté, pas contourné.                                    |
 | **Rampes exponentielles et zéro** (`exponentialRampToValueAtTime(0)` lève une exception ; une valeur de départ à 0 ne rampe pas)                                                                    | Constante `MIN_GAIN = 1e-4` (≈ −80 dB), jamais 0 sur un `AudioParam` rampé exponentiellement, et toute rampe précédée d'un `setValueAtTime` d'ancrage. La voix basse n'emploie aucune rampe : enveloppes et glissé passent par `setTargetAtTime`, qui part de la valeur courante et tolère une cible 0. Le faux AudioContext lève sur une rampe exponentielle vers ≤ 0.                                                                                                                                                       |
-| **Nœuds source non réutilisables** (`OscillatorNode`, `AudioBufferSourceNode` : un seul `start`, un seul `stop`)                                                                                    | Basse : **un oscillateur persistant** démarré au premier play et jamais stoppé pendant la session ; le silence vient du VCA. Drums : un nœud **par frappe**, `stop(t + durée)`, déconnexion à `ended`, aucune référence gardée. Interdiction de créer des nœuds dans la boucle rAF.                                                                                                                                                                                                                                           |
+| **Nœuds source non réutilisables** (`OscillatorNode`, `AudioBufferSourceNode` : un seul `start`, un seul `stop`)                                                                                    | Basse : **un oscillateur persistant** démarré au premier play et jamais stoppé pendant la session ; le silence vient du VCA. Drums : un nœud **par frappe**, `stop(t + durée)`, déconnexion à `ended` ; le kit ne garde la frappe que jusqu'à `ended`, pour le stop et le choke (lot 5). Interdiction de créer des nœuds dans la boucle rAF.                                                                                                                                                                                  |
 | **Timers throttlés en onglet caché** → trous dans la programmation                                                                                                                                  | Timer dans un **Web Worker** (`TimerSource`) ; `SCHEDULE_AHEAD_S` suffisamment large pour absorber un tick en retard ; le scheduler rattrape tous les pas dus plutôt que d'en sauter.                                                                                                                                                                                                                                                                                                                                         |
 | **Automations qui se chevauchent** (tempo élevé, slide + accent, knob tourné pendant une enveloppe)                                                                                                 | Avant chaque pas, `cancelScheduledValues(tStep)` sur chaque cible touchée puis ré-ancrage par `setValueAtTime` ou par un `setTargetAtTime` qui part de la valeur courante (on connaît le plan, donc pas besoin de `cancelAndHoldAtTime`, absent de Firefox). Les pas sans accent ne touchent pas à Q. Les knobs écrivent via `setTargetAtTime` avec une petite constante de lissage, ce qui se compose avec les enveloppes ; un retour au knob programmé par un plan est reprogrammé par la voix quand le knob bouge (lot 4). |
 | **Programmation dans le passé** (tick en retard)                                                                                                                                                    | `tSafe = max(t, currentTime + SCHEDULE_EPSILON_S)` dans `params.ts`. Test de rattrapage du scheduler.                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -570,10 +581,9 @@ fichier.
 
 **Dette**
 
-- README : la liste « À écouter à chaque lot » n'a pas bougé depuis le lot 0, alors que §6.5 promet une checklist par lot ; les checklists vivent dans les descriptions de PR.
-- `Transport.svelte` recopie `125` et `0.8`, `StepCell.svelte` recopie `DEFAULT_STEP` : `BPM_DEFAULT`, `DEFAULT_STEP` et `DEFAULT_MIX` ne sont pas exportés par `@engine`.
+- README : la liste « À écouter à chaque lot » ne couvre que les lots 0 et 5, alors que §6.5 promet une checklist par lot ; celles des lots 1 à 4 vivent dans les descriptions de PR.
+- `StepCell.svelte` recopie `DEFAULT_STEP`, que `@engine` n'exporte pas.
 - Tests exigés et absents : import de `@engine` en node pur (§6.2), pont `engine.svelte.ts` avec un moteur factice (§6.3).
-- Faux AudioContext : `setTargetAtTime` n'enregistre pas son `timeConstant`, `cancelScheduledValues` enregistre `value: NaN`.
 - `bass-voice.test.ts` retrouve le VCA par « un appel avec `value === 1` » au lieu de son branchement après le filtre (`findVca` dans `index.test.ts`) ; littéraux `36`, `1200`, `0.125` recopiés dans les tests.
 - `main` n'est pas protégée et `pnpm verify` ne lance pas `pnpm build`, que seule la CI exécute.
 
@@ -587,3 +597,5 @@ fichier.
 - Deux accents dans la même fenêtre de lookahead : le retour de Q du premier reste figé pendant au plus un pas.
 - `StepCell.svelte` : boutons A et S sous `--control-size` ; « tenu » absent sur les silences traversés par un slide et non annoncé aux lecteurs d'écran ; `~` affiché au-dessus de la note ; `.flag.on` déclaré deux fois.
 - `constants.ts` : `ACCENT_Q_ATTACK_TAU_S` et `ACCENT_Q_HOLD_S` sans commentaire d'intention.
+- `DrumGrid.svelte` : la colonne des noms décale la grille rythmique par rapport à la séquence basse ; alignement des deux grilles à reprendre avec la mise en page du lot 7.
+- Hat fermé et hat ouvert sur le même pas : les deux sonnent, le hat ouvert étant déclenché après le fermé ; à trancher si l'on veut que le fermé l'emporte.

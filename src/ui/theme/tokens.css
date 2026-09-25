@@ -48,6 +48,7 @@
   --shadow-raised: 0 2px 8px rgb(0 0 0 / 40%);
   --duration-fast: 120ms;
   --easing: cubic-bezier(0.2, 0, 0, 1);
+  --duration-blink: 400ms;
 
   /* Composants */
   --control-size: 44px; /* cible tactile minimale */
@@ -70,4 +71,19 @@
   --step-flag-on: var(--color-accent);
   --step-flag-off: var(--color-border);
   --step-held-color: var(--color-accent);
+
+  /* Grille rythmique : la hauteur du remplissage d'une case suit la vélocité */
+  --drum-cell-bg: var(--color-surface-raised);
+  --drum-cell-beat: var(--color-border);
+  --drum-cell-on: var(--color-accent);
+
+  /* Interrupteur */
+  --switch-width: 36px;
+  --switch-height: 20px;
+  --switch-inset: 2px;
+  --switch-travel: calc(var(--switch-width) - var(--switch-height));
+  --switch-track-off: var(--color-border);
+  --switch-track-on: var(--color-accent);
+  --switch-thumb: var(--color-text);
+  --switch-pending-opacity: 0.35;
 }

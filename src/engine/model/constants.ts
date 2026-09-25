@@ -133,3 +133,13 @@ export const SIDECHAIN_RELEASE_S = 0.08;
  * suivant annule tout ce qui est programmé après lui.
  */
 export const SIDECHAIN_HOLD_S = 0.02;
+
+/* ---------- Générateur ---------- */
+/**
+ * Probabilité qu'une note tirée hors du pas 0 soit la tonique, les six autres
+ * degrés se partageant le reste : une ligne acid revient sans cesse à la
+ * fondamentale.
+ */
+export const GENERATOR_TONIC_WEIGHT = 0.35;
+/** Part des sauts d'octave vers le haut : la note qui bondit à l'octave est le geste acid type. */
+export const GENERATOR_OCTAVE_UP_RATIO = 0.75;

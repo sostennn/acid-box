@@ -87,19 +87,24 @@ knob résonance tourné pendant une ligne accentuée ; stop en plein slide ou su
   niveaux), décision « Sidechain : interrupteur + amount ; attaque et retour en
   constantes ».
 - Risques §7 : nœuds source non réutilisables (C5), rampes vers 0 (C2), `safeTime` (B2),
-  fake à étendre (`FakeBufferSourceNode`, `stop`, `ended`, `timeConstant`).
+  fake étendu au lot 5 (`FakeAudioBuffer`, `loop`, `end()` pour `ended`, `timeConstant`).
 - Tests : `drum-plan.ts`, partie pure de `sidechain.ts`, drums contre le fake (un nœud par
-  frappe, `stop` appelé, pas de référence gardée), `DrumGrid.svelte` sous happy-dom,
-  `state.test.ts` pour les nouvelles commandes.
+  frappe, `stop` appelé, débranché et oublié à `ended`, choke, stop), `DrumGrid.svelte`
+  sous happy-dom, `knob-drag.test.ts` pour le tap, `state.test.ts` pour les nouvelles
+  commandes, mute quantifié de bout en bout dans `index.test.ts`.
 - À écouter : le groove complet ; la basse qui « pompe » sous le kick ; hat ouvert coupé
-  par le fermé ; mute instantané sans clic.
+  par le fermé ; mute et démute en lecture sur le premier temps de la mesure suivante,
+  sans clic ; à l'arrêt, mute immédiat.
 - Vigilance : timbres fixés par constantes (pas de knobs de timbre) ; la grille lit le
   même `audibleStep` que la basse (B4) ; le sidechain n'écrit que sur le bus basse ; la
   vélocité de la grille est un consommateur discret de `knobDrag` (E3) ; le choke du hat
   ouvert se décide d'après ce qui sonne, comme la liaison (C11) ; enveloppes de frappe et
   courbe de ducking en `setTargetAtTime` plutôt qu'en rampes (C2), avec des échéances
   qui tiennent dans le créneau d'un 16e impair (C12) ; `release` de chaque nouvelle voix
-  appelé par `stop()` (C6).
+  appelé par `stop()` (C6) ; mute quantifié à la mesure : frappes et ducking lisent
+  `appliedMutes`, jamais `drums[v].muted`, et le gain de mute, distinct du niveau, est
+  programmé au temps du pas 0 ; un tap de grille se décide d'après la valeur reçue par
+  `ontap` (lue à l'appui), pas d'après l'état courant.
 
 ## Lot 6 — Générateur de patterns
 

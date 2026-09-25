@@ -29,7 +29,7 @@ est-elle pure, et son test décrit-il un comportement que l'on peut casser ? ».
 | `synth/bass/bass-plan.ts`                | Note + octave → fréquence (le tuning passe par `applyParams`, testé dans `bass-voice.test.ts`) ; silence → aucun événement ; gate et enveloppe ; **pas tenu → glissé `target` de τ `SLIDE_TAU_S` au temps du pas, aucun événement d'enveloppe ni de Q** ; pas qui slide → pas de fermeture du VCA ; accent → pics supérieurs sur VCA, cutoff et Q, décroissance `ACCENT_ENV_DECAY_S` ; pas sans accent → aucun événement `filterQ` ; `timeConstant` > 0 et temps croissants au sens large par cible (`expectSane`) ; `cancel` en tête de chaque cible (C3, hors fermeture du VCA d'un pas tenu) |
 | `model/pattern.ts`                       | `holdContext` : silences sautés, bouclage 15 → 0, pattern d'un seul pas lié à lui-même, tout en silence → aucun pas précédent                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `model/defaults.ts`                      | La ligne de départ porte accents et slides, commence sur la tonique accentuée et boucle par un slide                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `synth/drums/drum-plan.ts` (lot 5)       | Vélocité 0 → rien ; amplitudes monotones en vélocité ; choke du hat ouvert par le hat fermé                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `synth/drums/drum-plan.ts` (lot 5)       | Vélocité 0 → rien ; voix mutée → rien ; niveau et queue monotones en vélocité (le choke se décide d'après ce qui sonne et se teste dans `drum-kit.test.ts`)                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `synth/sidechain.ts` partie pure (lot 5) | Événements de ducking aux temps des kicks non mutés ; désactivé → rien ; profondeur = amount                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `generator/acid-generator.ts` (lot 6)    | Déterminisme à seed égale ; pas 0 = tonique ; toutes les notes dans la gamme ; densités observées dans une tolérance sur 200 tirages ; densité 0 → aucun drapeau ; densité 1 → tous ; undo restaure `previousPattern`                                                                                                                                                                                                                                                                                                                                                                           |
 | `persistence/serialize.ts` (lot 7)       | Aller-retour JSON ; rejet d'un payload corrompu → défauts ; champ `version`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -44,8 +44,9 @@ changement n'est pas couvert, soit il ne change rien.
 `tests/fakes/fake-audio-context.ts` enregistre les nœuds créés par ordre de création
 (`oscillators`, `bufferSources`, `gains`, `filters`, `shapers`), leurs branchements
 (`connections`) et chaque appel aux `AudioParam` sous la forme `{ method, value, time }`
-(`setValueAtTime`, rampes, `setTargetAtTime`, `cancelScheduledValues`). Il **lève sur une
-rampe exponentielle vers ≤ 0** et sur un second `start()` d'une source. `currentTime` se
+(`setValueAtTime`, rampes, `setTargetAtTime` avec son `timeConstant`,
+`cancelScheduledValues` sans `value`). Il **lève sur une rampe exponentielle vers ≤ 0**
+et sur un second `start()` d'une source. `currentTime` se
 règle à la main, `setState('interrupted')` émet `statechange`, `createFakeVisibility()`
 remplace l'API Page Visibility. `tests/fakes/fake-clock.ts` fournit `FakeClock` (temps
 avancé à la main) et `FakeTimer` (`tick()` simule un réveil).
@@ -66,17 +67,19 @@ Ce qu'on vérifie avec :
   oscillateur ; un slide fait glisser la fréquence au pas suivant, à son temps et vers sa
   note ; un slide sur le pas 15 n'avale pas le premier pas au démarrage et lie le pas 0 du
   deuxième tour.
-- Drums (lot 5) : un nœud par frappe, `stop` appelé, aucune référence gardée.
-- Frontière : le lint suffit, mais un test qui importe `@engine` en node pur garantit
-  qu'aucune dépendance DOM ou Svelte n'a fui.
+- Drums (lot 5) : un nœud par frappe, `stop` appelé, débranché à `ended` et retiré du
+  registre ; choke, stop avant départ, niveau et mute sur deux gains distincts dans
+  `drum-kit.test.ts` ; mute quantifié à la mesure de bout en bout dans `index.test.ts`.
+- Frontière : un test qui importe `@engine` en node pur garantit qu'aucun accès au DOM
+  n'a lieu au chargement. Il ne voit pas une dépendance à Svelte, qui se charge en node :
+  c'est le lint qui la couvre (A1).
 
 Un nouveau nœud Web Audio utilisé par le moteur doit exister dans le fake, sinon le test
 ne peut pas exister : vérifier que `fake-audio-context.ts` grandit avec le graphe. Avant
 d'accepter une assertion sur un appel, relire ce que `ParamCall` enregistre à la version
-revue : si le `timeConstant` de `setTargetAtTime` n'y est pas, les constantes de temps sont
-invisibles aux tests de voix et se vérifient dans le test du plan ; si `cancelScheduledValues`
-enregistre `value: NaN`, toute assertion `every(c => c.value >= MIN_GAIN)` est piégée. Ces
-limites sont listées dans la dette du plan ; une PR qui étend le fake est bienvenue.
+revue. Depuis le lot 5, il enregistre le `timeConstant` de `setTargetAtTime`, et
+`cancelScheduledValues` n'a pas de `value` : une assertion `every(c => c.value >= MIN_GAIN)`
+doit filtrer les `cancel`. Une PR qui étend le fake est bienvenue.
 
 Les tests localisent les nœuds par ordre de création (`ctx.gains.at(-1)`,
 `const [master, bass] = ctx.gains`) ou par branchement : `findVca`, dans
@@ -129,7 +132,7 @@ partir de la section du lot dans `lot-checklists.md` et de ce que la PR touche :
 
 - pas de clic à l'arrêt ni au changement de forme d'onde ;
 - pas de zipper quand on tourne un knob ;
-- le curseur tombe sur le pas entendu, à 60 comme à 160 BPM ;
+- le curseur tombe sur le pas entendu, à 60 comme à 240 BPM ;
 - onglet caché puis retour : la lecture n'a pas décroché.
 
 ---
@@ -174,9 +177,11 @@ partir de la section du lot dans `lot-checklists.md` et de ce que la PR touche :
   la sortie de `pnpm test` ; en mode PR, les `it(` à la version revue
   (`references/github.md`, avec `[[:space:]]` et non `\s`, que le `git grep` de macOS ne
   connaît pas). À signaler en Nit, c'est la description qui est fausse.
-- Test de voix qui asserte un `timeConstant` : le fake ne l'enregistre pas, l'assertion
-  échoue ou ne teste rien ; vérifier plutôt `method`, `value` et `time`, et le
-  `timeConstant` dans le test du plan.
+- Test de geste avec un `dispatch` factice : la valeur ne bouge jamais pendant le geste,
+  donc un tap « avec tremblement » passe même si le code relit une valeur déjà modifiée.
+  Tester l'action elle-même avec un `getValue` qui suit les `onchange`
+  (`knob-drag.test.ts`), avec des mouvements sous le seuil de tap et en plusieurs petits
+  pas.
 - Littéraux recopiés dans un test à la place d'une constante exportée (`36` pour
   `BASE_OCTAVE_MIDI`, `1200` pour `TUNING_RANGE_SEMITONES * 100`) : cassera au premier
   réglage.

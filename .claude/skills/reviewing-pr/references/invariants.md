@@ -189,7 +189,7 @@ réutilisables », « Automations qui se chevauchent », « Clics à l'arrêt »
 | Deux événements au même temps                     | s'appliquent dans l'ordre d'insertion ; `cancel` puis `set` puis `target` au même `t` est la séquence légitime de C3                                                                    |
 | Valeur non finie (`NaN`, `Infinity`)              | exception sur toute méthode d'automation et sur `.value =`                                                                                                                              |
 | `GainNode.gain`                                   | démarre à 1 : un nœud créé et connecté sans initialisation est audible                                                                                                                  |
-| `OscillatorNode`, `AudioBufferSourceNode`         | un seul `start()`, un seul `stop()`, jamais redémarrés                                                                                                                                  |
+| `OscillatorNode`, `AudioBufferSourceNode`         | un seul `start()`, jamais redémarrés ; `stop()` peut être rappelé, le dernier appel l'emporte, et un `stop` antérieur au `start` empêche la source de sonner                            |
 | `AudioParam` hors plage nominale                  | la valeur est bornée silencieusement (fréquence de filtre entre 0 et Nyquist)                                                                                                           |
 
 ### C1 — Jamais `param.value =` sur un paramètre audible pendant que le son tourne
@@ -245,11 +245,13 @@ réutilisables », « Automations qui se chevauchent », « Clics à l'arrêt »
 
 - Règle : la basse démarre un oscillateur au premier play et ne le stoppe qu'au
   `dispose` ; le silence vient du VCA. Les drums (lot 5) créent un nœud source **par
-  frappe**, `start(t)`, `stop(t + durée)`, `disconnect` sur `ended`, aucune référence
-  gardée. Interdiction de créer un nœud dans la boucle rAF ou dans un gestionnaire de
-  pointer.
+  frappe**, `start(t)`, `stop(t + durée)`, `disconnect` sur `ended`. Le kit ne garde une
+  frappe que jusqu'à `ended`, dans son registre des frappes qui sonnent, pour le stop et le
+  choke (PLAN §5 lot 5) ; aucune autre référence. Interdiction de créer un nœud dans la
+  boucle rAF ou dans un gestionnaire de pointer.
 - Vérifier : aucun `oscillator.stop()` hors `dispose` ; dans une voix percussive, pas de
-  réutilisation d'un `AudioBufferSourceNode` ; les buffers de bruit sont générés une fois.
+  réutilisation d'un `AudioBufferSourceNode` ; les buffers de bruit sont générés une fois ;
+  le registre des frappes se vide à `ended` et au `release`.
 - Sévérité : Bloquant — Reliability.
 
 ### C6 — Stop sans clic, forme d'onde à chaud

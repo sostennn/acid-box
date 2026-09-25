@@ -120,14 +120,17 @@ Tout en parallèle. Les commandes exactes sont dans `references/github.md`.
 
 - Métadonnées : `gh pr view` en JSON (titre, corps, auteur, `state`, draft, `headRefOid`,
   `baseRefName`, `mergeCommit`, additions, suppressions, fichiers, `statusCheckRollup`).
-- `git fetch origin pull/N/head` : `FETCH_HEAD` est la version revue. Puis la base :
-  `BASE=$(git merge-base origin/<baseRefName> FETCH_HEAD)`, ou pour une PR fusionnée
+- Un seul fetch pour la tête et la base, vers une ref nommée :
+  `git fetch origin "+pull/N/head:refs/remotes/origin/pr/N" <baseRefName>`. La version revue
+  est `HEAD_REF=origin/pr/N`, jamais `FETCH_HEAD`, qu'un second fetch écrase. Vérifier que
+  `git rev-parse "$HEAD_REF"` vaut `headRefOid`, sinon relire les métadonnées. Puis la base :
+  `BASE=$(git merge-base origin/<baseRefName> "$HEAD_REF")`, ou pour une PR fusionnée
   `BASE=$(git rev-parse <mergeCommit>^1)`.
-- `git diff "$BASE" FETCH_HEAD --stat` et `--name-only`. En `--deep`, l'orchestrateur ne
+- `git diff "$BASE" "$HEAD_REF" --stat` et `--name-only`. En `--deep`, l'orchestrateur ne
   lit pas le diff complet : chaque sous-agent lit le sien.
 - **Ne jamais lire le worktree en mode PR** : il peut être sur une autre branche, avec des
-  fichiers que la PR ne contient pas. Fichier complet : `git show FETCH_HEAD:<chemin>` ;
-  numéro de ligne côté nouveau fichier : `git show FETCH_HEAD:<chemin> | grep -n '<extrait>'`.
+  fichiers que la PR ne contient pas. Fichier complet : `git show "$HEAD_REF:<chemin>"` ;
+  numéro de ligne côté nouveau fichier : `git show "$HEAD_REF:<chemin>" | grep -n '<extrait>'`.
 - Commentaires de review déjà présents sur la PR, pour ne pas répéter ce qui a été dit.
 - Login `gh` courant : si le reviewer est l'auteur de la PR, GitHub refusera
   `APPROVE` et `REQUEST_CHANGES` ; la review partira en `COMMENT`.

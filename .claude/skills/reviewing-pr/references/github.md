@@ -49,23 +49,27 @@ Version revue et base, sans toucher au worktree. Le worktree peut être sur une 
 branche : en mode PR, tout se lit par `git show`.
 
 ```bash
-git fetch origin "pull/<N>/head"                                  # FETCH_HEAD = tête de la PR
-BASE=$(git merge-base "origin/<baseRefName>" FETCH_HEAD)          # PR ouverte
+git fetch origin "+pull/<N>/head:refs/remotes/origin/pr/<N>" "<baseRefName>"   # un seul fetch
+HEAD_REF=origin/pr/<N>                                            # version revue
+test "$(git rev-parse "$HEAD_REF")" = "<headRefOid>"              # sinon la PR a bougé : relire les métadonnées
+BASE=$(git merge-base "origin/<baseRefName>" "$HEAD_REF")         # PR ouverte
 BASE=$(git rev-parse "<mergeCommit.oid>^1")                       # PR fusionnée : premier parent du merge
-git diff "$BASE" FETCH_HEAD --stat
-git diff "$BASE" FETCH_HEAD --name-only
-git diff "$BASE" FETCH_HEAD -- <chemins>                          # diff restreint à un domaine
-git show FETCH_HEAD:<chemin>                                      # fichier complet
-git show FETCH_HEAD:<chemin> | grep -n '<extrait>'                # numéro de ligne côté nouveau fichier
+git diff "$BASE" "$HEAD_REF" --stat
+git diff "$BASE" "$HEAD_REF" --name-only
+git diff "$BASE" "$HEAD_REF" -- <chemins>                         # diff restreint à un domaine
+git show "$HEAD_REF:<chemin>"                                     # fichier complet
+git show "$HEAD_REF:<chemin>" | grep -n '<extrait>'               # numéro de ligne côté nouveau fichier
 ```
 
-`mergeCommit.oid` vient de `gh pr view "<REF>" --json mergeCommit`. Sur une PR fusionnée,
-`git merge-base origin/main FETCH_HEAD` renvoie la tête elle-même et le diff serait vide.
+Jamais `FETCH_HEAD` : tout `git fetch` suivant l'écrase, y compris celui de la base, et la
+revue lirait alors `main` à la place de la PR. `mergeCommit.oid` vient de
+`gh pr view "<REF>" --json mergeCommit`. Sur une PR fusionnée,
+`git merge-base origin/main "$HEAD_REF"` renvoie la tête elle-même et le diff serait vide.
 
 Décompte des tests à la version revue, à comparer au chiffre de la description :
 
 ```bash
-git grep -c -E '^[[:space:]]*it\(' FETCH_HEAD -- 'src/**/*.test.ts' 'tests/**/*.test.ts' | awk -F: '{ s += $NF } END { print s }'
+git grep -c -E '^[[:space:]]*it\(' "$HEAD_REF" -- 'src/**/*.test.ts' 'tests/**/*.test.ts' | awk -F: '{ s += $NF } END { print s }'
 # `[[:space:]]` et non `\s` : le git grep de macOS (ERE POSIX) ne connaît pas `\s`.
 ```
 
@@ -73,7 +77,7 @@ Evidence sans CI (check absent ou en attente), toujours hors du worktree :
 
 ```bash
 TMP=$(mktemp -d -t acid-verify) && mkdir -p "$TMP/pr"
-git archive FETCH_HEAD | tar -x -C "$TMP/pr"
+git archive "$HEAD_REF" | tar -x -C "$TMP/pr"
 ( cd "$TMP/pr" && pnpm install --frozen-lockfile && pnpm verify )
 ```
 

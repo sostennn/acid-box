@@ -5,6 +5,7 @@
   import BassSequencer from './components/BassSequencer.svelte';
   import DrumGrid from './components/DrumGrid.svelte';
   import DrumPanel from './components/DrumPanel.svelte';
+  import GeneratorPanel from './components/GeneratorPanel.svelte';
   import Transport from './components/Transport.svelte';
   import { createPlayhead } from './playhead/playhead.svelte';
   import { createEngineStore } from './state/engine.svelte';
@@ -54,7 +55,12 @@
       <BassPanel bass={engine.state.bass} dispatch={engine.dispatch} />
     </section>
 
-    <section class="panel">
+    <section class="panel stack">
+      <GeneratorPanel
+        generator={engine.state.generator}
+        canUndo={engine.state.previousBass !== null}
+        dispatch={engine.dispatch}
+      />
       <BassSequencer
         pattern={engine.state.pattern.bass}
         activeStep={playhead.step}
@@ -62,7 +68,7 @@
       />
     </section>
 
-    <section class="panel drums">
+    <section class="panel stack">
       <DrumPanel
         drums={engine.state.drums}
         appliedMutes={engine.state.appliedMutes}
@@ -116,7 +122,7 @@
     background: var(--color-surface);
   }
 
-  .drums {
+  .stack {
     display: flex;
     flex-direction: column;
     gap: var(--space-5);

@@ -49,7 +49,13 @@ export { DRUM_VOICES } from './model/types';
 export { cutoffToHz, decayToSeconds, resonanceToQ, tuningToCents } from './model/mapping';
 export { holdContext } from './model/pattern';
 export { SCALE_IDS } from './model/scales';
-export { PITCH_RANGE_SEMITONES, indexToPitch, pitchLabel, pitchToIndex } from './model/pitch';
+export {
+  NOTE_NAMES,
+  PITCH_RANGE_SEMITONES,
+  indexToPitch,
+  pitchLabel,
+  pitchToIndex,
+} from './model/pitch';
 
 export interface EngineOptions {
   readonly createContext?: AudioContextFactory;

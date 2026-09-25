@@ -576,4 +576,8 @@ jouable, CI verte », H2, README « Feuille de route ».
 Zone préservée par `/forging-review-skill --refresh`. Y noter les invariants décidés en
 revue et pas encore écrits dans `docs/PLAN.md` ou le README, avec leur date.
 
+- 2026-09-25 (lot 6) — D4 : `as PitchClass` après `clamp(Math.round(…), 0, 11)` dans
+  `clampGenerator` (`state.ts`) et après un `% 12` dans `scales.ts` rejoint les casts
+  acceptés.
+
 <!-- manual:end -->

@@ -346,6 +346,7 @@ export interface EngineOptions {
   readonly createContext?: AudioContextFactory; // injecté pour test / offline
   readonly visibility?: VisibilitySource; // Page Visibility, fake en test
   readonly timer?: TimerSource; // worker par défaut, fake en test
+  readonly randomSeed?: () => number; // seed d'un run du générateur sans seed fixée, fixe en test
   // storage?: StorageAdapter — lot 7 : localStorage par défaut, mémoire en test
 }
 ```

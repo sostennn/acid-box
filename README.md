@@ -74,3 +74,4 @@ patterns et enregistrement (v3), export WAV, partage par URL et Web MIDI (v4).
 - Stop en plein slide ou sur un accent : pas de clic, pas de saut de hauteur.
 - Slide sur le pas 16 puis play : la première note sonne, puis glisse au tour suivant.
 - Résonance au maximum sur un pas accentué : pas d'instabilité.
+- Générer ou annuler en pleine lecture, y compris en plein slide : pas de clic, pas de note coincée.

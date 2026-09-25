@@ -107,8 +107,12 @@ export interface EngineState {
   readonly audio: AudioInfo;
   readonly transport: TransportState;
   readonly pattern: Pattern;
-  /** Undo à un niveau du générateur. */
-  readonly previousPattern: Pattern | null;
+  /**
+   * Undo à un niveau du générateur : la ligne de basse d'avant le dernier run.
+   * Effacé par toute édition manuelle d'un pas de basse, pour qu'un undo ne
+   * défasse jamais une édition faite à la main.
+   */
+  readonly previousBass: BassPattern | null;
   readonly bass: BassParams;
   /** `muted` y est le mute demandé ; en lecture, il ne s'entend qu'à la mesure suivante. */
   readonly drums: DrumParams;

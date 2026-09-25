@@ -17,6 +17,7 @@ import { createScheduler, type Scheduler } from './clock/scheduler';
 import { stepDurationSeconds } from './clock/timing';
 import { createWorkerTimer } from './clock/worker-timer';
 import type { Command } from './commands';
+import { randomSeed } from './generator/rng';
 import { START_DELAY_S } from './model/constants';
 import { createInitialState } from './model/defaults';
 import { DRUM_VOICES, type EngineState, type StepIndex } from './model/types';
@@ -39,6 +40,7 @@ export {
 export {
   DEFAULT_BASS,
   DEFAULT_DRUMS,
+  DEFAULT_GENERATOR,
   DEFAULT_MIX,
   DEFAULT_STEP,
   DEFAULT_TRANSPORT,
@@ -46,12 +48,15 @@ export {
 export { DRUM_VOICES } from './model/types';
 export { cutoffToHz, decayToSeconds, resonanceToQ, tuningToCents } from './model/mapping';
 export { holdContext } from './model/pattern';
+export { SCALE_IDS } from './model/scales';
 export { PITCH_RANGE_SEMITONES, indexToPitch, pitchLabel, pitchToIndex } from './model/pitch';
 
 export interface EngineOptions {
   readonly createContext?: AudioContextFactory;
   readonly visibility?: VisibilitySource;
   readonly timer?: TimerSource;
+  /** Seed d'un run du générateur quand ses paramètres n'en fixent pas. */
+  readonly randomSeed?: () => number;
 }
 
 export interface Engine {
@@ -68,6 +73,7 @@ export interface Engine {
 export function createEngine(options: EngineOptions = {}): Engine {
   const audio = createAudioManager(options);
   const timer = options.timer ?? createWorkerTimer();
+  const drawSeed = options.randomSeed ?? randomSeed;
   const playhead = createPlayheadQueue();
   const listeners = new Set<(state: EngineState) => void>();
 
@@ -198,6 +204,10 @@ export function createEngine(options: EngineOptions = {}): Engine {
         case 'mix/set':
           setState(reduce(state, command));
           graph?.applyMix(state.mix);
+          return;
+        case 'generator/run':
+          // Le hasard reste hors du reducer ; la nouvelle ligne est lue au prochain pas programmé.
+          setState(reduce(state, { ...command, seed: state.generator.seed ?? drawSeed() }));
           return;
         case 'bass/setKnob':
         case 'bass/setWaveform':

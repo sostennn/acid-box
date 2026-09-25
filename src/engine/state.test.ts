@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { generateAcidLine } from './generator/acid-generator';
 import { BPM_MAX, BPM_MIN } from './model/constants';
 import { createInitialState } from './model/defaults';
+import type { PitchClass } from './model/types';
 import { applyPendingMutes, reduce } from './state';
 
 const initial = createInitialState({ availability: 'locked', sampleRate: null, outputLatency: 0 });
@@ -122,6 +124,64 @@ describe('reduce', () => {
     const playing = reduce(initial, { type: 'transport/play' });
     const requested = reduce(playing, { type: 'drums/setMuted', voice: 'kick', muted: true });
     expect(reduce(requested, { type: 'transport/stop' }).appliedMutes.kick).toBe(true);
+  });
+
+  it('generator/setParams borne densités, tonique et seed', () => {
+    const next = reduce(initial, {
+      type: 'generator/setParams',
+      patch: { noteDensity: 1.5, slideDensity: -0.2, accentDensity: NaN, scale: 'phrygian' },
+    });
+    expect(next.generator).toEqual({
+      ...initial.generator,
+      noteDensity: 1,
+      slideDensity: 0,
+      accentDensity: 0,
+      scale: 'phrygian',
+    });
+    const root = (value: number) =>
+      reduce(initial, { type: 'generator/setParams', patch: { root: value as PitchClass } })
+        .generator.root;
+    expect(root(14)).toBe(11);
+    expect(root(-3)).toBe(0);
+    expect(root(4.4)).toBe(4);
+    const seed = (value: number | null) =>
+      reduce(initial, { type: 'generator/setParams', patch: { seed: value } }).generator.seed;
+    expect(seed(12.8)).toBe(12);
+    expect(seed(-1)).toBe(2 ** 32 - 1);
+    expect(seed(null)).toBeNull();
+  });
+
+  it('generator/run remplace la basse, garde l’ancienne pour l’undo, laisse la rythmique', () => {
+    const next = reduce(initial, { type: 'generator/run', seed: 7 });
+    expect(next.pattern.bass).toEqual(generateAcidLine(initial.generator, 7));
+    expect(next.previousBass).toBe(initial.pattern.bass);
+    expect(next.pattern.drums).toBe(initial.pattern.drums);
+    expect(initial.previousBass).toBeNull();
+  });
+
+  it('generator/undo restaure la ligne d’avant le dernier run, une seule fois', () => {
+    const first = reduce(initial, { type: 'generator/run', seed: 1 });
+    const second = reduce(first, { type: 'generator/run', seed: 2 });
+    const undone = reduce(second, { type: 'generator/undo' });
+    expect(undone.pattern.bass).toBe(first.pattern.bass);
+    expect(undone.previousBass).toBeNull();
+    expect(reduce(undone, { type: 'generator/undo' })).toBe(undone);
+    expect(reduce(initial, { type: 'generator/undo' })).toBe(initial);
+  });
+
+  it('une édition manuelle de la basse efface l’undo, pas une édition de la rythmique', () => {
+    const generated = reduce(initial, { type: 'generator/run', seed: 3 });
+    const drumEdit = reduce(generated, {
+      type: 'pattern/setDrumVelocity',
+      voice: 'kick',
+      index: 1,
+      velocity: 1,
+    });
+    expect(drumEdit.previousBass).toBe(initial.pattern.bass);
+    const stepEdit = reduce(generated, { type: 'pattern/setStep', index: 0, patch: { note: 5 } });
+    expect(stepEdit.previousBass).toBeNull();
+    const flagEdit = reduce(generated, { type: 'pattern/toggleStepFlag', index: 0, flag: 'slide' });
+    expect(flagEdit.previousBass).toBeNull();
   });
 
   it('ne touche pas au reste de l’état', () => {

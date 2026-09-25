@@ -2,7 +2,9 @@
  * Reducer pur : (état, commande) → nouvel état. Aucun effet de bord ; les
  * effets (démarrer le scheduler, programmer du son) sont dans index.ts.
  */
-import type { Command } from './commands';
+import type { ReducibleCommand } from './commands';
+import { generateAcidLine } from './generator/acid-generator';
+import { toSeed } from './generator/rng';
 import { BPM_MAX, BPM_MIN } from './model/constants';
 import { mutesOf } from './model/defaults';
 import {
@@ -11,7 +13,9 @@ import {
   type DrumVoiceId,
   type DrumVoiceParams,
   type EngineState,
+  type GeneratorParams,
   type MixParams,
+  type PitchClass,
   type SidechainParams,
   type Step,
   type StepIndex,
@@ -19,7 +23,7 @@ import {
   type Velocity,
 } from './model/types';
 
-export function reduce(state: EngineState, command: Command): EngineState {
+export function reduce(state: EngineState, command: ReducibleCommand): EngineState {
   switch (command.type) {
     case 'transport/play':
       return withTransport(state, { status: 'playing' });
@@ -55,6 +59,21 @@ export function reduce(state: EngineState, command: Command): EngineState {
       return withDrumVoice(state, command.voice, { level: clamp(command.value, 0, 1) });
     case 'mix/set':
       return { ...state, mix: { ...state.mix, ...clampPatch(command.patch) } };
+    case 'generator/setParams':
+      return { ...state, generator: { ...state.generator, ...clampGenerator(command.patch) } };
+    case 'generator/run':
+      return {
+        ...state,
+        pattern: { ...state.pattern, bass: generateAcidLine(state.generator, command.seed) },
+        previousBass: state.pattern.bass,
+      };
+    case 'generator/undo':
+      if (state.previousBass === null) return state;
+      return {
+        ...state,
+        pattern: { ...state.pattern, bass: state.previousBass },
+        previousBass: null,
+      };
   }
 }
 
@@ -80,7 +99,11 @@ function withBassStep(
 ): EngineState {
   const current = state.pattern.bass[index];
   const bass = state.pattern.bass.map((step, i) => (i === index ? update(current) : step));
-  return { ...state, pattern: { ...state.pattern, bass: bass as unknown as BassPattern } };
+  return {
+    ...state,
+    pattern: { ...state.pattern, bass: bass as unknown as BassPattern },
+    previousBass: null,
+  };
 }
 
 function withDrumStep(
@@ -104,6 +127,28 @@ function withDrumVoice(
 
 function clampSidechain(patch: Partial<SidechainParams>): Partial<SidechainParams> {
   return patch.amount === undefined ? patch : { ...patch, amount: clamp(patch.amount, 0, 1) };
+}
+
+const GENERATOR_DENSITIES = [
+  'noteDensity',
+  'accentDensity',
+  'slideDensity',
+  'octaveJumpDensity',
+] as const;
+
+function clampGenerator(patch: Partial<GeneratorParams>): Partial<GeneratorParams> {
+  let result = patch;
+  for (const key of GENERATOR_DENSITIES) {
+    const value = patch[key];
+    if (value !== undefined) result = { ...result, [key]: clamp(value, 0, 1) };
+  }
+  if (patch.root !== undefined) {
+    result = { ...result, root: clamp(Math.round(patch.root), 0, 11) as PitchClass };
+  }
+  if (patch.seed !== undefined && patch.seed !== null) {
+    result = { ...result, seed: toSeed(patch.seed) };
+  }
+  return result;
 }
 
 function clampPatch(patch: Partial<MixParams>): Partial<MixParams> {

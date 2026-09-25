@@ -5,19 +5,21 @@ import {
   findVca,
 } from '../../tests/fakes/fake-audio-context';
 import { FakeTimer } from '../../tests/fakes/fake-clock';
+import { generateAcidLine } from './generator/acid-generator';
 import { createEngine } from './index';
 import { BPM_DEFAULT, MIN_GAIN, SIDECHAIN_MAX_DEPTH, START_DELAY_S } from './model/constants';
 import { DEFAULT_TRANSPORT } from './model/defaults';
 import { midiToFrequency, pitchToMidi } from './model/pitch';
 import { stepDurationSeconds } from './clock/timing';
 
-function setup() {
+function setup(randomSeed: () => number = () => 0) {
   const ctx = new FakeAudioContext();
   const timer = new FakeTimer();
   const engine = createEngine({
     createContext: () => ctx.asContext(),
     visibility: createFakeVisibility(),
     timer,
+    randomSeed,
   });
   return { ctx, timer, engine };
 }
@@ -339,5 +341,39 @@ describe('createEngine', () => {
     engine.dispose();
     expect(timer.disposed).toBe(true);
     expect(ctx.oscillators[0]?.stoppedAt).not.toBeNull();
+  });
+
+  describe('générateur', () => {
+    it('tire une seed quand les paramètres n’en fixent pas', () => {
+      const randomSeed = vi.fn(() => 7);
+      const { engine } = setup(randomSeed);
+      engine.dispatch({ type: 'generator/run' });
+      expect(randomSeed).toHaveBeenCalledOnce();
+      expect(engine.getState().pattern.bass).toEqual(
+        generateAcidLine(engine.getState().generator, 7),
+      );
+    });
+
+    it('rejoue la même ligne avec une seed fixée, sans tirage', () => {
+      const randomSeed = vi.fn(() => 7);
+      const { engine } = setup(randomSeed);
+      engine.dispatch({ type: 'generator/setParams', patch: { seed: 99 } });
+      engine.dispatch({ type: 'generator/run' });
+      const first = engine.getState().pattern.bass;
+      expect(first).toEqual(generateAcidLine(engine.getState().generator, 99));
+      engine.dispatch({ type: 'generator/run' });
+      expect(engine.getState().pattern.bass).toEqual(first);
+      expect(randomSeed).not.toHaveBeenCalled();
+    });
+
+    it('l’undo revient à la ligne d’avant le run', () => {
+      const { engine } = setup(() => 7);
+      const before = engine.getState().pattern.bass;
+      engine.dispatch({ type: 'generator/run' });
+      expect(engine.getState().pattern.bass).not.toEqual(before);
+      engine.dispatch({ type: 'generator/undo' });
+      expect(engine.getState().pattern.bass).toBe(before);
+      expect(engine.getState().previousBass).toBeNull();
+    });
   });
 });

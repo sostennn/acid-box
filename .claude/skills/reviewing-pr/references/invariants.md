@@ -390,7 +390,8 @@ Source : PLAN §4, H3 à H9, README « Ce qui décide est pur ».
 - H4 : octave de base C2 = MIDI 36, décalage −1/0/+1, plage C1–B3, tuning
   ±`TUNING_RANGE_SEMITONES`.
 - H5 : `STEP_COUNT = 16` fixe, **pas de champ `length`** avant v3.
-- H6 : générateur avec sauts d'octave et undo à un niveau via `previousPattern`.
+- H6 : générateur avec sauts d'octave et undo à un niveau via `previousBass` (basse seule,
+  effacé par une édition manuelle d'un pas de basse).
 - H7 : vélocité rythmique continue 0..1, 0 = pas inactif ; clic = toggle à la vélocité
   par défaut, drag vertical = réglage fin.
 - H8 : le hat ouvert est étouffé par le hat fermé.
@@ -574,5 +575,9 @@ jouable, CI verte », H2, README « Feuille de route ».
 
 Zone préservée par `/forging-review-skill --refresh`. Y noter les invariants décidés en
 revue et pas encore écrits dans `docs/PLAN.md` ou le README, avec leur date.
+
+- 2026-09-25 (lot 6) — D4 : `as PitchClass` après `clamp(Math.round(…), 0, 11)` dans
+  `clampGenerator` (`state.ts`) et après un `% 12` dans `scales.ts` rejoint les casts
+  acceptés.
 
 <!-- manual:end -->

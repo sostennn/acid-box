@@ -8,7 +8,7 @@ Projet personnel destiné à GitHub : un synthétiseur basse monophonique de typ
 est le synthé basse et le plaisir de le jouer en direct au knob. La qualité du
 code est un objectif au même titre que le résultat sonore.
 
-Ce document planifie la **v1** en détail et esquisse v2–v4. Les lots 0 à 5 sont
+Ce document planifie la **v1** en détail et esquisse v2–v4. Les lots 0 à 6 sont
 livrés (état dans la feuille de route du README). Quand le code s'écarte de ce
 plan, c'est le code qui fait foi et ce document est corrigé dans la même PR ;
 les écarts pas encore traités sont listés dans « Dette et points ouverts », à la
@@ -42,7 +42,7 @@ signaler si l'une ne convient pas.
 | H3  | Toutes les valeurs de knobs sont stockées **normalisées 0..1** dans l'état ; la conversion en Hz / Q / secondes vit dans le moteur (courbes nommées). Rend les knobs, la persistance et le futur partage par URL indépendants des unités. | Unités physiques dans l'état.               |
 | H4  | Octave de base = C2 (MIDI 36). Avec le décalage ±1, la plage jouable est C1–B3. Le knob tuning couvre ±12 demi-tons (constante `TUNING_RANGE_SEMITONES`).                                                                                 | Autre centre ou plage.                      |
 | H5  | Longueur de pattern fixée à 16 (constante `STEP_COUNT`), pas de champ `length` dans le modèle v1. Il sera ajouté en v3 avec le chaînage.                                                                                                  | Champ `length` dès v1.                      |
-| H6  | Le générateur peut aussi poser des **sauts d'octave** (densité dédiée) et dispose d'un **undo à un niveau** (le pattern précédent est conservé).                                                                                          | Pas de sauts / pas d'undo.                  |
+| H6  | Le générateur peut aussi poser des **sauts d'octave** (densité dédiée) et dispose d'un **undo à un niveau** (la ligne de basse précédente est conservée).                                                                                 | Pas de sauts / pas d'undo.                  |
 | H7  | Vélocité rythmique continue 0..1 (0 = pas inactif). UI : clic = toggle à la vélocité par défaut, drag vertical = réglage fin.                                                                                                             | Deux niveaux (normal / accent).             |
 | H8  | Le hat ouvert est **étouffé** par le hat fermé (choke group), comme sur une boîte à rythmes classique.                                                                                                                                    | Voix indépendantes.                         |
 | H9  | Un knob **master** plus un niveau bus basse et un niveau bus rythmique.                                                                                                                                                                   | Master seul.                                |
@@ -279,7 +279,7 @@ export interface EngineState {
   readonly audio: AudioInfo;
   readonly transport: TransportParams & { readonly status: TransportStatus };
   readonly pattern: Pattern;
-  readonly previousPattern: Pattern | null; // undo à un niveau du générateur
+  readonly previousBass: BassPattern | null; // undo à un niveau du générateur, effacé par une édition manuelle de la basse
   readonly bass: BassParams;
   readonly drums: DrumParams; // muted = mute demandé
   readonly appliedMutes: DrumMutes; // mute entendu : rejoint drums au pas 0 en lecture, aussitôt à l'arrêt
@@ -346,6 +346,7 @@ export interface EngineOptions {
   readonly createContext?: AudioContextFactory; // injecté pour test / offline
   readonly visibility?: VisibilitySource; // Page Visibility, fake en test
   readonly timer?: TimerSource; // worker par défaut, fake en test
+  readonly randomSeed?: () => number; // seed d'un run du générateur sans seed fixée, fixe en test
   // storage?: StorageAdapter — lot 7 : localStorage par défaut, mémoire en test
 }
 ```
@@ -441,6 +442,12 @@ verte, et fait l'objet d'un ou plusieurs commits (sur demande). Difficulté :
 - `rng.ts` seedable, `scales.ts`.
 - `acid-generator.ts` : tonique sur le pas 0, notes contraintes à la gamme, densités notes / accents / slides / sauts d'octave, quelques heuristiques de plausibilité (pas de slide vers un silence isolé, répétitions de tonique favorisées, sauts d'octave sur les notes de la gamme).
 - Commandes `generator/run` et `generator/undo`, `GeneratorPanel.svelte`.
+- Décisions prises à l'implémentation :
+  - **Le hasard reste hors du reducer.** Quand `seed` vaut `null`, `index.ts` tire la seed (`randomSeed` de `rng.ts`, injectable par `EngineOptions.randomSeed`) et passe au reducer un `generator/run` qui la porte (`ReducibleCommand`). `Math.random` est interdit par ESLint dans le moteur, sauf dans `rng.ts` et pour le bruit blanc de `noise.ts`.
+  - **Le générateur ne touche que la basse**, et l'undo aussi : `previousBass` remplace `previousPattern`. Toute édition manuelle d'un pas de basse l'efface, pour qu'un undo ne défasse jamais une édition faite à la main ; une édition de la rythmique le laisse.
+  - **La nouvelle ligne remplace l'ancienne tout de suite**, comme une édition manuelle (latence ≤ lookahead, H12), sans attendre la mesure : pas d'état en attente, et l'undo reste simple.
+  - **La seed n'est pas exposée dans l'interface** : le moteur et les tests s'en servent, elle prendra son sens avec le partage par URL (v4).
+  - Heuristiques : la tonique occupe `GENERATOR_TONIC_WEIGHT` des notes tirées, les autres degrés se partagent le reste ; un saut d'octave monte dans `GENERATOR_OCTAVE_UP_RATIO` des cas ; un slide n'est jamais posé devant un silence d'un seul pas, qu'il comblerait, mais reste possible à travers des silences plus longs.
 - **On entend** : une nouvelle ligne crédible à chaque pression, retour arrière possible.
 
 ### Lot 7 — Persistance, robustesse, finition ★
@@ -583,7 +590,7 @@ fichier.
 
 **Dette**
 
-- `main` n'est pas protégée : ni PR obligatoire ni check `verify` requis avant merge.
+- Aucune.
 
 **Points ouverts**
 

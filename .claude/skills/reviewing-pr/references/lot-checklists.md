@@ -111,7 +111,7 @@ knob résonance tourné pendant une ligne accentuée ; stop en plein slide ou su
 - Livre : `generator/rng.ts` seedable, `model/scales.ts` (mineure, phrygienne),
   `acid-generator.ts` pur (tonique au pas 0, notes dans la gamme, densités notes /
   accents / slides / sauts d'octave, heuristiques de plausibilité) ; commandes
-  `generator/setParams`, `generator/run`, `generator/undo` avec `previousPattern` ;
+  `generator/setParams`, `generator/run`, `generator/undo` avec `previousBass` ;
   `GeneratorPanel.svelte`.
 - Hypothèses : H6 (sauts d'octave, undo à un niveau).
 - Tests : table §6.1 ligne `acid-generator.ts` ; reducer `generator/undo`.

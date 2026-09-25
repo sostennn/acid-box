@@ -6,6 +6,7 @@ import type {
   BassKnobId,
   BassWaveform,
   DrumVoiceId,
+  GeneratorParams,
   MixParams,
   Normalized,
   SidechainParams,
@@ -34,4 +35,15 @@ export type Command =
   | { readonly type: 'bass/setKnob'; readonly knob: BassKnobId; readonly value: Normalized }
   | { readonly type: 'drums/setMuted'; readonly voice: DrumVoiceId; readonly muted: boolean }
   | { readonly type: 'drums/setLevel'; readonly voice: DrumVoiceId; readonly value: Normalized }
-  | { readonly type: 'mix/set'; readonly patch: Partial<MixParams> };
+  | { readonly type: 'mix/set'; readonly patch: Partial<MixParams> }
+  | { readonly type: 'generator/setParams'; readonly patch: Partial<GeneratorParams> }
+  | { readonly type: 'generator/run' }
+  | { readonly type: 'generator/undo' };
+
+/**
+ * Forme reçue par le reducer : le moteur y a résolu la seed du run (celle des
+ * paramètres, ou une seed tirée au hasard), pour que `reduce` reste pur.
+ */
+export type ReducibleCommand =
+  | Exclude<Command, { readonly type: 'generator/run' }>
+  | { readonly type: 'generator/run'; readonly seed: number };

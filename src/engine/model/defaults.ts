@@ -126,7 +126,7 @@ export function createInitialState(audio: AudioInfo): EngineState {
     audio,
     transport: DEFAULT_TRANSPORT,
     pattern: DEFAULT_PATTERN,
-    previousPattern: null,
+    previousBass: null,
     bass: DEFAULT_BASS,
     drums: DEFAULT_DRUMS,
     appliedMutes: mutesOf(DEFAULT_DRUMS),

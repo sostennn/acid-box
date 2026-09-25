@@ -59,7 +59,7 @@ Le plan détaillé est dans [docs/PLAN.md](docs/PLAN.md).
 | 3   | La voix basse                                | fait |
 | 4   | Accent et slide                              | fait |
 | 5   | Rythmique et sidechain                       | fait |
-| 6   | Générateur de patterns                       |      |
+| 6   | Générateur de patterns                       | fait |
 | 7   | Persistance, robustesse, finition            |      |
 
 Versions ultérieures : filtre en échelle en AudioWorklet (v2), banque de
@@ -74,3 +74,4 @@ patterns et enregistrement (v3), export WAV, partage par URL et Web MIDI (v4).
 - Stop en plein slide ou sur un accent : pas de clic, pas de saut de hauteur.
 - Slide sur le pas 16 puis play : la première note sonne, puis glisse au tour suivant.
 - Résonance au maximum sur un pas accentué : pas d'instabilité.
+- Générer ou annuler en pleine lecture, y compris en plein slide : pas de clic, pas de note coincée.

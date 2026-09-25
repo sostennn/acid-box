@@ -183,7 +183,7 @@ function createBrowserContext(): AudioContextLike {
   return new Ctor({ latencyHint: 'interactive' });
 }
 
-function createDocumentVisibility(): VisibilitySource {
+export function createDocumentVisibility(): VisibilitySource {
   if (typeof document === 'undefined') {
     return { isVisible: () => true, onChange: () => () => {} };
   }

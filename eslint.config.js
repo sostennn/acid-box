@@ -61,8 +61,13 @@ export default ts.config(
     rules: { 'no-restricted-properties': 'off' },
   },
   {
-    // Seuls le worker de timer et les tests ont le droit d'utiliser les timers du navigateur.
-    files: ['src/engine/clock/timer.worker.ts', 'src/engine/**/*.test.ts'],
+    // Seuls le worker de timer et les tests ont le droit d'utiliser les timers du navigateur,
+    // plus la sauvegarde différée : elle écrit sur le stockage et ne programme aucun son.
+    files: [
+      'src/engine/clock/timer.worker.ts',
+      'src/engine/persistence/storage.ts',
+      'src/engine/**/*.test.ts',
+    ],
     rules: { 'no-restricted-globals': 'off' },
   },
 );

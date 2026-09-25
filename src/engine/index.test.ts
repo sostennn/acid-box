@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   FakeAudioContext,
   createFakeVisibility,
@@ -7,21 +7,37 @@ import {
 import { FakeTimer } from '../../tests/fakes/fake-clock';
 import { generateAcidLine } from './generator/acid-generator';
 import { createEngine } from './index';
-import { BPM_DEFAULT, MIN_GAIN, SIDECHAIN_MAX_DEPTH, START_DELAY_S } from './model/constants';
-import { DEFAULT_TRANSPORT } from './model/defaults';
+import {
+  BPM_DEFAULT,
+  MIN_GAIN,
+  SAVE_DEBOUNCE_MS,
+  SIDECHAIN_MAX_DEPTH,
+  START_DELAY_S,
+} from './model/constants';
+import { DEFAULT_TRANSPORT, createInitialState } from './model/defaults';
+import { restoreState, serialize } from './persistence/serialize';
+import { createMemoryStorage, type StorageAdapter } from './persistence/storage';
+import { reduce } from './state';
 import { midiToFrequency, pitchToMidi } from './model/pitch';
 import { stepDurationSeconds } from './clock/timing';
 
-function setup(randomSeed: () => number = () => 0) {
+interface SetupOptions {
+  readonly randomSeed?: () => number;
+  readonly storage?: StorageAdapter;
+}
+
+function setup({ randomSeed = () => 0, storage = createMemoryStorage() }: SetupOptions = {}) {
   const ctx = new FakeAudioContext();
   const timer = new FakeTimer();
+  const visibility = createFakeVisibility();
   const engine = createEngine({
     createContext: () => ctx.asContext(),
-    visibility: createFakeVisibility(),
+    visibility,
     timer,
     randomSeed,
+    storage,
   });
-  return { ctx, timer, engine };
+  return { ctx, timer, engine, visibility, storage };
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -346,7 +362,7 @@ describe('createEngine', () => {
   describe('générateur', () => {
     it('tire une seed quand les paramètres n’en fixent pas', () => {
       const randomSeed = vi.fn(() => 7);
-      const { engine } = setup(randomSeed);
+      const { engine } = setup({ randomSeed });
       engine.dispatch({ type: 'generator/run' });
       expect(randomSeed).toHaveBeenCalledOnce();
       expect(engine.getState().pattern.bass).toEqual(
@@ -356,7 +372,7 @@ describe('createEngine', () => {
 
     it('rejoue la même ligne avec une seed fixée, sans tirage', () => {
       const randomSeed = vi.fn(() => 7);
-      const { engine } = setup(randomSeed);
+      const { engine } = setup({ randomSeed });
       engine.dispatch({ type: 'generator/setParams', patch: { seed: 99 } });
       engine.dispatch({ type: 'generator/run' });
       const first = engine.getState().pattern.bass;
@@ -367,13 +383,84 @@ describe('createEngine', () => {
     });
 
     it('l’undo revient à la ligne d’avant le run', () => {
-      const { engine } = setup(() => 7);
+      const { engine } = setup({ randomSeed: () => 7 });
       const before = engine.getState().pattern.bass;
       engine.dispatch({ type: 'generator/run' });
       expect(engine.getState().pattern.bass).not.toEqual(before);
       engine.dispatch({ type: 'generator/undo' });
       expect(engine.getState().pattern.bass).toBe(before);
       expect(engine.getState().previousBass).toBeNull();
+    });
+  });
+
+  describe('persistance', () => {
+    afterEach(() => vi.useRealTimers());
+
+    const AUDIO = { availability: 'locked', sampleRate: null, outputLatency: 0 } as const;
+    const saved = (storage: StorageAdapter) => restoreState(storage.load(), AUDIO);
+
+    it('démarre sur l’état sauvegardé', () => {
+      const stored = reduce(createInitialState(AUDIO), { type: 'transport/setBpm', bpm: 90 });
+      const { engine } = setup({ storage: createMemoryStorage(serialize(stored)) });
+      expect(engine.getState().transport.bpm).toBe(90);
+    });
+
+    it('le son démarre sur les réglages restaurés', async () => {
+      const stored = [
+        { type: 'bass/setWaveform', waveform: 'square' },
+        { type: 'drums/setMuted', voice: 'kick', muted: true },
+      ] as const;
+      const initialState = createInitialState(AUDIO);
+      const { engine, ctx } = setup({
+        storage: createMemoryStorage(
+          serialize(stored.reduce((state, command) => reduce(state, command), initialState)),
+        ),
+      });
+      engine.dispatch({ type: 'transport/play' });
+      await flush();
+      expect(persistentOscillators(ctx)[0]?.type).toBe('square');
+      expect(kickStarts(ctx)).toEqual([]);
+    });
+
+    it('sauvegarde un réglage une fois le délai écoulé, une seule fois pour une rafale', () => {
+      vi.useFakeTimers();
+      const { engine, storage } = setup();
+      const save = vi.spyOn(storage, 'save');
+      engine.dispatch({ type: 'bass/setKnob', knob: 'cutoff', value: 0.4 });
+      engine.dispatch({ type: 'bass/setKnob', knob: 'cutoff', value: 0.6 });
+      expect(save).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(SAVE_DEBOUNCE_MS);
+      expect(save).toHaveBeenCalledOnce();
+      expect(saved(storage).bass.cutoff).toBe(0.6);
+    });
+
+    it('ni le déblocage audio ni la lecture ne déclenchent de sauvegarde', async () => {
+      vi.useFakeTimers();
+      const { engine, storage } = setup();
+      const save = vi.spyOn(storage, 'save');
+      await engine.unlock();
+      engine.dispatch({ type: 'transport/play' });
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      expect(engine.getState().transport.status).toBe('playing');
+      engine.dispatch({ type: 'transport/stop' });
+      vi.advanceTimersByTime(SAVE_DEBOUNCE_MS);
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('écrit sans attendre quand l’onglet passe en arrière-plan', () => {
+      vi.useFakeTimers();
+      const { engine, storage, visibility } = setup();
+      engine.dispatch({ type: 'transport/setBpm', bpm: 100 });
+      visibility.set(false);
+      expect(saved(storage).transport.bpm).toBe(100);
+    });
+
+    it('dispose écrit ce qui est en attente', () => {
+      vi.useFakeTimers();
+      const { engine, storage } = setup();
+      engine.dispatch({ type: 'transport/setShuffle', value: 0.5 });
+      engine.dispose();
+      expect(saved(storage).transport.shuffle).toBe(0.5);
     });
   });
 });

@@ -7,6 +7,7 @@
  */
 import {
   createAudioManager,
+  createDocumentVisibility,
   type AudioContextFactory,
   type AudioContextLike,
   type VisibilitySource,
@@ -19,8 +20,13 @@ import { createWorkerTimer } from './clock/worker-timer';
 import type { Command } from './commands';
 import { randomSeed } from './generator/rng';
 import { START_DELAY_S } from './model/constants';
-import { createInitialState } from './model/defaults';
 import { DRUM_VOICES, type EngineState, type StepIndex } from './model/types';
+import { persistedChanged, restoreState, serialize } from './persistence/serialize';
+import {
+  createDebouncedWriter,
+  createLocalStorage,
+  type StorageAdapter,
+} from './persistence/storage';
 import { applyPendingMutes, reduce } from './state';
 import { createBassVoice, type BassVoice } from './synth/bass/bass-voice';
 import { createDrumKit, type DrumKit } from './synth/drums/drum-kit';
@@ -29,6 +35,7 @@ import { createAudioGraph, type AudioGraph } from './synth/graph';
 
 export type { AudioAvailability, AudioInfo } from './audio/context';
 export type { Command, StepFlag } from './commands';
+export type { StorageAdapter } from './persistence/storage';
 export type * from './model/types';
 export {
   BPM_MAX,
@@ -63,6 +70,8 @@ export interface EngineOptions {
   readonly timer?: TimerSource;
   /** Seed d'un run du générateur quand ses paramètres n'en fixent pas. */
   readonly randomSeed?: () => number;
+  /** État de travail sauvegardé : `localStorage` par défaut. */
+  readonly storage?: StorageAdapter;
 }
 
 export interface Engine {
@@ -77,22 +86,32 @@ export interface Engine {
 }
 
 export function createEngine(options: EngineOptions = {}): Engine {
-  const audio = createAudioManager(options);
+  const visibility = options.visibility ?? createDocumentVisibility();
+  const audio = createAudioManager({ ...options, visibility });
   const timer = options.timer ?? createWorkerTimer();
+  const storage = options.storage ?? createLocalStorage();
+  const writer = createDebouncedWriter(storage);
   const drawSeed = options.randomSeed ?? randomSeed;
   const playhead = createPlayheadQueue();
   const listeners = new Set<(state: EngineState) => void>();
 
-  let state: EngineState = createInitialState(audio.info);
+  let state: EngineState = restoreState(storage.load(), audio.info);
   let graph: AudioGraph | null = null;
   let voice: BassVoice | null = null;
   let drums: DrumKit | null = null;
   let scheduler: Scheduler | null = null;
 
   const setState = (next: EngineState) => {
+    const previous = state;
     state = next;
+    if (persistedChanged(previous, next)) writer.schedule(() => serialize(state));
     listeners.forEach((listener) => listener(state));
   };
+
+  // iOS tue souvent un onglet caché sans prévenir : on n'attend pas le délai de sauvegarde.
+  const stopFlushOnHide = visibility.onChange(() => {
+    if (!visibility.isVisible()) writer.flush();
+  });
 
   const stopAudioUpdates = audio.onChange((info) => setState({ ...state, audio: info }));
 
@@ -236,6 +255,9 @@ export function createEngine(options: EngineOptions = {}): Engine {
       return playhead.audibleStep(ctx.currentTime - state.audio.outputLatency);
     },
     dispose() {
+      writer.flush();
+      writer.dispose();
+      stopFlushOnHide();
       scheduler?.stop();
       timer.dispose();
       voice?.dispose();

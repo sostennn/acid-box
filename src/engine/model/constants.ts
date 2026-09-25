@@ -143,3 +143,11 @@ export const SIDECHAIN_HOLD_S = 0.02;
 export const GENERATOR_TONIC_WEIGHT = 0.35;
 /** Part des sauts d'octave vers le haut : la note qui bondit à l'octave est le geste acid type. */
 export const GENERATOR_OCTAVE_UP_RATIO = 0.75;
+
+/* ---------- Persistance ---------- */
+/**
+ * Délai de sauvegarde après la dernière modification : un geste de knob envoie
+ * une commande par événement pointer, on n'écrit qu'une fois qu'il s'arrête.
+ * Assez court pour qu'un rechargement juste après ne perde rien.
+ */
+export const SAVE_DEBOUNCE_MS = 400;

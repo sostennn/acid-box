@@ -405,6 +405,23 @@ describe('createEngine', () => {
       expect(engine.getState().transport.bpm).toBe(90);
     });
 
+    it('le son démarre sur les réglages restaurés', async () => {
+      const stored = [
+        { type: 'bass/setWaveform', waveform: 'square' },
+        { type: 'drums/setMuted', voice: 'kick', muted: true },
+      ] as const;
+      const initialState = createInitialState(AUDIO);
+      const { engine, ctx } = setup({
+        storage: createMemoryStorage(
+          serialize(stored.reduce((state, command) => reduce(state, command), initialState)),
+        ),
+      });
+      engine.dispatch({ type: 'transport/play' });
+      await flush();
+      expect(persistentOscillators(ctx)[0]?.type).toBe('square');
+      expect(kickStarts(ctx)).toEqual([]);
+    });
+
     it('sauvegarde un réglage une fois le délai écoulé, une seule fois pour une rafale', () => {
       vi.useFakeTimers();
       const { engine, storage } = setup();

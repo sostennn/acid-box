@@ -59,7 +59,7 @@ Le plan détaillé est dans [docs/PLAN.md](docs/PLAN.md).
 | 3   | La voix basse                                | fait |
 | 4   | Accent et slide                              | fait |
 | 5   | Rythmique et sidechain                       | fait |
-| 6   | Générateur de patterns                       |      |
+| 6   | Générateur de patterns                       | fait |
 | 7   | Persistance, robustesse, finition            |      |
 
 Versions ultérieures : filtre en échelle en AudioWorklet (v2), banque de

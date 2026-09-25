@@ -390,7 +390,8 @@ Source : PLAN §4, H3 à H9, README « Ce qui décide est pur ».
 - H4 : octave de base C2 = MIDI 36, décalage −1/0/+1, plage C1–B3, tuning
   ±`TUNING_RANGE_SEMITONES`.
 - H5 : `STEP_COUNT = 16` fixe, **pas de champ `length`** avant v3.
-- H6 : générateur avec sauts d'octave et undo à un niveau via `previousPattern`.
+- H6 : générateur avec sauts d'octave et undo à un niveau via `previousBass` (basse seule,
+  effacé par une édition manuelle d'un pas de basse).
 - H7 : vélocité rythmique continue 0..1, 0 = pas inactif ; clic = toggle à la vélocité
   par défaut, drag vertical = réglage fin.
 - H8 : le hat ouvert est étouffé par le hat fermé.

@@ -94,14 +94,21 @@ Le mode local ne poste jamais rien : il sert à corriger avant d'ouvrir la PR.
 
 **Profondeur** : sobre par défaut, une seule passe sans sous-agent.
 
-| Option    | Pour                                         | Ce qui change                                                                                                        |
-| --------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `--quick` | petite PR, avant push, « c'est mergeable ? » | diff et sections d'invariants des domaines touchés ; contexte lu pour confirmer un finding seulement ; rapport court |
-| aucune    | cas général                                  | une passe inline, contexte hors diff par recherches ciblées, vérification adversariale complète                      |
-| `--deep`  | demande explicite                            | un sous-agent par domaine (4b) ; au-delà de 1500 lignes, le proposer en tête du rapport sans le lancer               |
+| Option    | Pour                                         | Ce qui change                                                                                                                                                |
+| --------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--quick` | petite PR, avant push, « c'est mergeable ? » | diff et sections d'invariants des domaines touchés ; fonctions pivots lues en entier ; autre contexte lu pour confirmer un finding seulement ; rapport court |
+| aucune    | cas général                                  | une passe inline, contexte hors diff par recherches ciblées, vérification adversariale complète                                                              |
+| `--deep`  | demande explicite                            | un sous-agent par domaine (4b) ; au-delà de 1500 lignes, le proposer en tête du rapport sans le lancer                                                       |
 
-Ordre de grandeur : quelques dizaines de milliers de tokens en `--quick`, une centaine en
-passe normale, 50 à 100 k par sous-agent en `--deep`.
+**Fonctions pivots, à tous les niveaux** : quand le diff modifie une fonction appelée par
+plusieurs consommateurs (action `knobDrag`, helpers de `audio/params.ts`, scheduler,
+reducer, `dispatch`), ou lui ajoute un consommateur, lire la fonction entière à la version
+revue, pas seulement le hunk. Un nouveau callback interagit avec le code existant hors du
+hunk : un tap qui lit une valeur déjà modifiée par le déplacement ne se voit qu'ainsi.
+
+Ordre de grandeur mesuré en sous-agent sur une PR d'environ 2000 lignes : 160 k tokens en
+`--quick`, 190 k en passe normale. La lecture du diff domine : `--quick` n'économise
+nettement que sur une petite PR. `--deep` ajoute 50 à 100 k par sous-agent.
 
 ---
 
@@ -131,7 +138,9 @@ Tout en parallèle. Les commandes exactes sont dans `references/github.md`.
 - `git diff "$BASE" --stat`, `git diff "$BASE"` (worktree inclus), `git log "$BASE"..HEAD --oneline`.
 - Messages de commit : anglais, `type(scope): message`. Un écart est un Nit, pas plus.
 
-**Taille** : au-delà de 1500 lignes, proposer `--deep` en tête du rapport sans le lancer ;
+**Taille** : en `--quick`, au-delà de 800 lignes, dire en tête du rapport que la passe
+normale coûte à peine plus et trouve davantage, et la recommander, sans changer de niveau
+d'office. Au-delà de 1500 lignes, proposer `--deep` en tête du rapport sans le lancer ;
 au-delà de 3000, proposer une revue en plusieurs passes par domaine.
 
 ---

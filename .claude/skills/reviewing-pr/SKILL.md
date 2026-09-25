@@ -106,9 +106,11 @@ reducer, `dispatch`), ou lui ajoute un consommateur, lire la fonction entière �
 revue, pas seulement le hunk. Un nouveau callback interagit avec le code existant hors du
 hunk : un tap qui lit une valeur déjà modifiée par le déplacement ne se voit qu'ainsi.
 
-Ordre de grandeur mesuré en sous-agent sur une PR d'environ 2000 lignes : 160 k tokens en
-`--quick`, 190 k en passe normale. La lecture du diff domine : `--quick` n'économise
-nettement que sur une petite PR. `--deep` ajoute 50 à 100 k par sous-agent.
+Ordre de grandeur mesuré en sous-agent : sur une PR d'environ 2000 lignes (#8), 160 k
+tokens en `--quick` et 190 k en passe normale ; sur une PR d'environ 250 lignes (#7), 110 k
+et 130 k, en 2 min 30 contre 5 min. Le coût fixe (skill, références, collecte) domine une
+petite PR : `--quick` y fait gagner du temps, peu de tokens. `--deep` ajoute 50 à 100 k
+par sous-agent.
 
 ---
 

@@ -44,8 +44,9 @@ changement n'est pas couvert, soit il ne change rien.
 `tests/fakes/fake-audio-context.ts` enregistre les nœuds créés par ordre de création
 (`oscillators`, `bufferSources`, `gains`, `filters`, `shapers`), leurs branchements
 (`connections`) et chaque appel aux `AudioParam` sous la forme `{ method, value, time }`
-(`setValueAtTime`, rampes, `setTargetAtTime`, `cancelScheduledValues`). Il **lève sur une
-rampe exponentielle vers ≤ 0** et sur un second `start()` d'une source. `currentTime` se
+(`setValueAtTime`, rampes, `setTargetAtTime` avec son `timeConstant`,
+`cancelScheduledValues` sans `value`). Il **lève sur une rampe exponentielle vers ≤ 0**
+et sur un second `start()` d'une source. `currentTime` se
 règle à la main, `setState('interrupted')` émet `statechange`, `createFakeVisibility()`
 remplace l'API Page Visibility. `tests/fakes/fake-clock.ts` fournit `FakeClock` (temps
 avancé à la main) et `FakeTimer` (`tick()` simule un réveil).
@@ -69,8 +70,9 @@ Ce qu'on vérifie avec :
 - Drums (lot 5) : un nœud par frappe, `stop` appelé, débranché à `ended` et retiré du
   registre ; choke, stop avant départ, niveau et mute sur deux gains distincts dans
   `drum-kit.test.ts` ; mute quantifié à la mesure de bout en bout dans `index.test.ts`.
-- Frontière : le lint suffit, mais un test qui importe `@engine` en node pur garantit
-  qu'aucune dépendance DOM ou Svelte n'a fui.
+- Frontière : un test qui importe `@engine` en node pur garantit qu'aucun accès au DOM
+  n'a lieu au chargement. Il ne voit pas une dépendance à Svelte, qui se charge en node :
+  c'est le lint qui la couvre (A1).
 
 Un nouveau nœud Web Audio utilisé par le moteur doit exister dans le fake, sinon le test
 ne peut pas exister : vérifier que `fake-audio-context.ts` grandit avec le graphe. Avant
@@ -130,7 +132,7 @@ partir de la section du lot dans `lot-checklists.md` et de ce que la PR touche :
 
 - pas de clic à l'arrêt ni au changement de forme d'onde ;
 - pas de zipper quand on tourne un knob ;
-- le curseur tombe sur le pas entendu, à 60 comme à 160 BPM ;
+- le curseur tombe sur le pas entendu, à 60 comme à 240 BPM ;
 - onglet caché puis retour : la lecture n'a pas décroché.
 
 ---

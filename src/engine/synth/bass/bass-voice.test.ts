@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { FakeAudioContext } from '../../../../tests/fakes/fake-audio-context';
-import { ACCENT_Q_HOLD_S, KNOB_SMOOTHING_S, MIN_GAIN } from '../../model/constants';
+import {
+  ACCENT_Q_HOLD_S,
+  KNOB_SMOOTHING_S,
+  MIN_GAIN,
+  STOP_RELEASE_TAU_S,
+} from '../../model/constants';
 import { DEFAULT_BASS, DEFAULT_STEP } from '../../model/defaults';
 import { accentedQ, cutoffToHz, resonanceToQ } from '../../model/mapping';
 import { midiToFrequency } from '../../model/pitch';
@@ -86,6 +91,7 @@ describe('createBassVoice', () => {
       method: 'setTargetAtTime',
       value: MIN_GAIN,
       time: 1.05,
+      timeConstant: STOP_RELEASE_TAU_S,
     });
     expect(ctx.oscillators[0]?.stoppedAt).toBeNull();
   });

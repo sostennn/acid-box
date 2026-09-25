@@ -79,11 +79,11 @@ enregistre `value: NaN`, toute assertion `every(c => c.value >= MIN_GAIN)` est p
 limites sont listées dans la dette du plan ; une PR qui étend le fake est bienvenue.
 
 Les tests localisent les nœuds par ordre de création (`ctx.gains.at(-1)`,
-`const [master, bass] = ctx.gains`) ou par branchement : `findVca` dans `index.test.ts`
-prend le gain branché en sortie du filtre, et survit à un changement de pattern ou d'accent.
-Un test qui retrouve le VCA par « un appel avec `value === 1` » puis asserte « un appel à
-1 » ne prouve rien, et casse dès que le premier pas est accentué ; `bass-voice.test.ts` le
-fait encore (dette, `docs/PLAN.md`). Un nouveau test suit le modèle `findVca`.
+`const [master, bass] = ctx.gains`) ou par branchement : `findVca`, dans
+`tests/fakes/fake-audio-context.ts`, prend le gain branché en sortie du filtre de la
+basse, et survit à un changement de pattern ou d'accent. Un test qui retrouve le VCA par
+« un appel avec `value === 1` » puis asserte « un appel à 1 » ne prouve rien, et casse dès
+que le premier pas est accentué. Un nouveau test de voix utilise `findVca`.
 
 ---
 

@@ -64,7 +64,7 @@ signaler si l'une ne convient pas.
 | **Vitest** (node) + **@testing-library/svelte** (happy-dom) + **Vitest browser mode** (Playwright, Chromium) pour quelques tests audio réels sur `OfflineAudioContext` | Voir §6. La logique du moteur est testée sans Web Audio ; le mode navigateur ne sert qu'aux tests de rendu sonore.                                                                                                                                                                                                                                                                  |
 | **ESLint flat config** + `eslint-plugin-svelte` + **Prettier** + `svelte-check`                                                                                        | Standard. `no-restricted-imports` matérialise la frontière moteur / UI (voir §3).                                                                                                                                                                                                                                                                                                   |
 | **pnpm**                                                                                                                                                               | Rapide, lockfile strict.                                                                                                                                                                                                                                                                                                                                                            |
-| **GitHub Actions** : `ci.yml` (typecheck, lint, stylelint, tests) sur push/PR ; `deploy.yml` (build + Pages) sur `main`                                                | Démo jouable en ligne dès le lot 0.                                                                                                                                                                                                                                                                                                                                                 |
+| **GitHub Actions** : `ci.yml` (`pnpm verify` : typecheck, lint, stylelint, tests, build) sur push/PR ; `deploy.yml` (build + Pages) sur `main`                         | Démo jouable en ligne dès le lot 0.                                                                                                                                                                                                                                                                                                                                                 |
 
 Points volontairement écartés : Tone.js (masquerait le scheduling, qui est
 justement le sujet), une lib de knobs (le geste est une fonctionnalité),
@@ -77,7 +77,7 @@ Zustand/Redux (le moteur joue déjà ce rôle).
 ```
 acid-box/
 ├── .github/workflows/
-│   ├── ci.yml                      # typecheck + lint + stylelint + tests
+│   ├── ci.yml                      # pnpm verify (typecheck, lint, stylelint, tests, build)
 │   └── deploy.yml                  # build + GitHub Pages
 ├── public/                         # favicon uniquement (aucun asset audio)
 ├── src/

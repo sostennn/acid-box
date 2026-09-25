@@ -1,17 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { FakeAudioContext } from '../../../../tests/fakes/fake-audio-context';
-import { ACCENT_Q_HOLD_S, KNOB_SMOOTHING_S, MIN_GAIN } from '../../model/constants';
+import { FakeAudioContext, findVca } from '../../../../tests/fakes/fake-audio-context';
+import { stepDurationSeconds } from '../../clock/timing';
+import {
+  ACCENT_Q_HOLD_S,
+  BPM_DEFAULT,
+  KNOB_SMOOTHING_S,
+  MIN_GAIN,
+  STOP_RELEASE_TAU_S,
+} from '../../model/constants';
 import { DEFAULT_BASS, DEFAULT_STEP } from '../../model/defaults';
-import { accentedQ, cutoffToHz, resonanceToQ } from '../../model/mapping';
-import { midiToFrequency } from '../../model/pitch';
+import { accentedQ, cutoffToHz, resonanceToQ, tuningToCents } from '../../model/mapping';
+import { BASE_OCTAVE_MIDI, midiToFrequency } from '../../model/pitch';
 import { createBiquadFilterStage } from '../filter-stage';
 import { createBassVoice } from './bass-voice';
+
+const STEP_S = stepDurationSeconds(BPM_DEFAULT);
 
 const plan = (time: number, step = DEFAULT_STEP) => ({
   step,
   params: DEFAULT_BASS,
   time,
-  stepDuration: 0.125,
+  stepDuration: STEP_S,
 });
 
 function setup() {
@@ -41,7 +50,7 @@ describe('createBassVoice', () => {
 
   it('cent déclenchements n’allouent aucune nouvelle source', () => {
     const { ctx, voice, oscillator } = setup();
-    for (let i = 0; i < 100; i += 1) voice.trigger(plan(i * 0.125));
+    for (let i = 0; i < 100; i += 1) voice.trigger(plan(i * STEP_S));
     expect(ctx.oscillators).toHaveLength(1);
     expect(oscillator?.frequency.calls.filter((c) => c.method === 'setValueAtTime')).toHaveLength(
       100,
@@ -52,7 +61,7 @@ describe('createBassVoice', () => {
     const { ctx, voice, oscillator, filter } = setup();
     ctx.currentTime = 5;
     voice.trigger(plan(4.9));
-    const vca = ctx.gains.find((g) => g.gain.calls.some((c) => c.value === 1));
+    const vca = findVca(ctx);
 
     expect(oscillator?.frequency.calls.at(-1)?.time).toBeGreaterThan(5);
     expect(filter?.detune.calls.some((c) => c.method === 'setTargetAtTime' && c.value === 0)).toBe(
@@ -69,7 +78,7 @@ describe('createBassVoice', () => {
     expect(filter?.Q.calls.at(-1)).toMatchObject({ method: 'setTargetAtTime' });
     expect(oscillator?.detune.calls.at(-1)).toMatchObject({
       method: 'setTargetAtTime',
-      value: 1200,
+      value: tuningToCents(1),
     });
   });
 
@@ -81,11 +90,12 @@ describe('createBassVoice', () => {
       method: 'cancelScheduledValues',
       time: 1.05,
     });
-    const vca = ctx.gains.find((g) => g.gain.calls.some((c) => c.value === 1));
+    const vca = findVca(ctx);
     expect(vca?.gain.calls.at(-1)).toMatchObject({
       method: 'setTargetAtTime',
       value: MIN_GAIN,
       time: 1.05,
+      timeConstant: STOP_RELEASE_TAU_S,
     });
     expect(ctx.oscillators[0]?.stoppedAt).toBeNull();
   });
@@ -105,14 +115,14 @@ describe('createBassVoice', () => {
   it('le pas qui suit un slide glisse vers sa note sans rouvrir le VCA', () => {
     const { ctx, voice, oscillator } = setup();
     voice.trigger(plan(1, { ...DEFAULT_STEP, slide: true }));
-    const vca = ctx.gains.find((g) => g.gain.calls.some((c) => c.value === 1));
+    const vca = findVca(ctx);
     const vcaCalls = vca?.gain.calls.length;
 
-    voice.trigger(plan(1.125, { ...DEFAULT_STEP, note: 7 }));
+    voice.trigger(plan(1 + STEP_S, { ...DEFAULT_STEP, note: 7 }));
     expect(oscillator?.frequency.calls.at(-1)).toMatchObject({
       method: 'setTargetAtTime',
-      time: 1.125,
-      value: midiToFrequency(43),
+      time: 1 + STEP_S,
+      value: midiToFrequency(BASE_OCTAVE_MIDI + 7),
     });
     expect(vca?.gain.calls.slice(vcaCalls ?? 0).some((c) => c.value === 1)).toBe(false);
   });
@@ -126,9 +136,9 @@ describe('createBassVoice', () => {
     expect(oscillator?.frequency.calls.at(-1)).toMatchObject({
       method: 'setValueAtTime',
       time: 2,
-      value: midiToFrequency(43),
+      value: midiToFrequency(BASE_OCTAVE_MIDI + 7),
     });
-    const vca = ctx.gains.find((g) => g.gain.calls.some((c) => c.value === 1));
+    const vca = findVca(ctx);
     expect(vca?.gain.calls).toContainEqual(
       expect.objectContaining({ method: 'setTargetAtTime', time: 2, value: 1 }),
     );
@@ -137,12 +147,12 @@ describe('createBassVoice', () => {
   it('un silence entre le slide et le pas suivant ne coupe pas la liaison', () => {
     const { voice, oscillator } = setup();
     voice.trigger(plan(1, { ...DEFAULT_STEP, slide: true }));
-    voice.trigger(plan(1.125, { ...DEFAULT_STEP, rest: true }));
-    voice.trigger(plan(1.25, { ...DEFAULT_STEP, note: 7 }));
+    voice.trigger(plan(1 + STEP_S, { ...DEFAULT_STEP, rest: true }));
+    voice.trigger(plan(1 + 2 * STEP_S, { ...DEFAULT_STEP, note: 7 }));
     expect(oscillator?.frequency.calls.at(-1)).toMatchObject({
       method: 'setTargetAtTime',
-      time: 1.25,
-      value: midiToFrequency(43),
+      time: 1 + 2 * STEP_S,
+      value: midiToFrequency(BASE_OCTAVE_MIDI + 7),
     });
   });
 

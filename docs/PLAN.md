@@ -64,7 +64,7 @@ signaler si l'une ne convient pas.
 | **Vitest** (node) + **@testing-library/svelte** (happy-dom) + **Vitest browser mode** (Playwright, Chromium) pour quelques tests audio réels sur `OfflineAudioContext` | Voir §6. La logique du moteur est testée sans Web Audio ; le mode navigateur ne sert qu'aux tests de rendu sonore.                                                                                                                                                                                                                                                                  |
 | **ESLint flat config** + `eslint-plugin-svelte` + **Prettier** + `svelte-check`                                                                                        | Standard. `no-restricted-imports` matérialise la frontière moteur / UI (voir §3).                                                                                                                                                                                                                                                                                                   |
 | **pnpm**                                                                                                                                                               | Rapide, lockfile strict.                                                                                                                                                                                                                                                                                                                                                            |
-| **GitHub Actions** : `ci.yml` (typecheck, lint, stylelint, tests) sur push/PR ; `deploy.yml` (build + Pages) sur `main`                                                | Démo jouable en ligne dès le lot 0.                                                                                                                                                                                                                                                                                                                                                 |
+| **GitHub Actions** : `ci.yml` (`pnpm verify` : typecheck, lint, stylelint, tests, build) sur push/PR ; `deploy.yml` (build + Pages) sur `main`                         | Démo jouable en ligne dès le lot 0.                                                                                                                                                                                                                                                                                                                                                 |
 
 Points volontairement écartés : Tone.js (masquerait le scheduling, qui est
 justement le sujet), une lib de knobs (le geste est une fonctionnalité),
@@ -77,7 +77,7 @@ Zustand/Redux (le moteur joue déjà ce rôle).
 ```
 acid-box/
 ├── .github/workflows/
-│   ├── ci.yml                      # typecheck + lint + stylelint + tests
+│   ├── ci.yml                      # pnpm verify (typecheck, lint, stylelint, tests, build)
 │   └── deploy.yml                  # build + GitHub Pages
 ├── public/                         # favicon uniquement (aucun asset audio)
 ├── src/
@@ -511,8 +511,10 @@ Peu nombreux, marqués lents, exécutés en CI avec Playwright :
 
 ### 6.5 Ce qui reste à l'oreille
 
-Une checklist manuelle par lot dans le README (« écouter : pas de clic à
-l'arrêt, pas de zipper au knob, shuffle sensible, sidechain visible »).
+Chaque PR de lot liste, dans la section « À écouter » de sa description, ce que
+l'auteur a vérifié à l'oreille et que le reviewer refait. Le README garde la
+liste courte de ce qu'il faut réécouter à chaque lot, et l'enrichit quand un lot
+ajoute un risque qui vaut pour la suite.
 Le rendu musical final n'est pas automatisable ; le plan vise à ce que **tout
 ce qui est logique** le soit.
 
@@ -581,11 +583,7 @@ fichier.
 
 **Dette**
 
-- README : la liste « À écouter à chaque lot » ne couvre que les lots 0 et 5, alors que §6.5 promet une checklist par lot ; celles des lots 1 à 4 vivent dans les descriptions de PR.
-- `StepCell.svelte` recopie `DEFAULT_STEP`, que `@engine` n'exporte pas.
-- Tests exigés et absents : import de `@engine` en node pur (§6.2), pont `engine.svelte.ts` avec un moteur factice (§6.3).
-- `bass-voice.test.ts` retrouve le VCA par « un appel avec `value === 1` » au lieu de son branchement après le filtre (`findVca` dans `index.test.ts`) ; littéraux `36`, `1200`, `0.125` recopiés dans les tests.
-- `main` n'est pas protégée et `pnpm verify` ne lance pas `pnpm build`, que seule la CI exécute.
+- `main` n'est pas protégée : ni PR obligatoire ni check `verify` requis avant merge.
 
 **Points ouverts**
 

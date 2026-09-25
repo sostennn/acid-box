@@ -1,20 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { stepDurationSeconds } from '../../clock/timing';
 import {
   ACCENT_ENV_DECAY_S,
   ACCENT_MAX_GAIN_BOOST,
   ACCENT_MAX_OCTAVES,
   ACCENT_Q_BOOST_DB,
+  BPM_DEFAULT,
   GATE_RATIO,
   MIN_GAIN,
   SLIDE_TAU_S,
 } from '../../model/constants';
 import { DEFAULT_BASS, DEFAULT_STEP } from '../../model/defaults';
 import { decayToSeconds, envModToCents, resonanceToQ } from '../../model/mapping';
-import { midiToFrequency } from '../../model/pitch';
+import { BASE_OCTAVE_MIDI, midiToFrequency } from '../../model/pitch';
 import { planStep, type ParamEvent } from './bass-plan';
 
-const base = { params: DEFAULT_BASS, held: false, time: 10, stepDuration: 0.125 };
-const gateEnd = 10 + 0.125 * GATE_RATIO;
+const STEP_S = stepDurationSeconds(BPM_DEFAULT);
+const base = { params: DEFAULT_BASS, held: false, time: 10, stepDuration: STEP_S };
+const gateEnd = 10 + STEP_S * GATE_RATIO;
 
 const ofTarget = (events: ParamEvent[], target: ParamEvent['target']) =>
   events.filter((event) => event.target === target);
@@ -38,7 +41,11 @@ describe('planStep — note simple', () => {
     const events = planStep({ ...base, step: { ...DEFAULT_STEP, note: 9, octave: -1 } });
     const freq = ofTarget(events, 'frequency');
     expect(freq[0]).toEqual({ target: 'frequency', kind: 'cancel', time: 10 });
-    expect(freq[1]).toMatchObject({ kind: 'set', time: 10, value: midiToFrequency(36 - 12 + 9) });
+    expect(freq[1]).toMatchObject({
+      kind: 'set',
+      time: 10,
+      value: midiToFrequency(BASE_OCTAVE_MIDI - 12 + 9),
+    });
     expectSane(events);
   });
 
@@ -112,7 +119,7 @@ describe('planStep — slide', () => {
         target: 'frequency',
         kind: 'target',
         time: 10,
-        value: midiToFrequency(43),
+        value: midiToFrequency(BASE_OCTAVE_MIDI + 7),
         timeConstant: SLIDE_TAU_S,
       },
     ]);
@@ -158,7 +165,11 @@ describe('planStep — slide', () => {
     const events = planStep({ ...base, held: true, step: { ...DEFAULT_STEP, note: 0 } });
     expect(ofTarget(events, 'frequency')).toEqual([
       { target: 'frequency', kind: 'cancel', time: 10 },
-      expect.objectContaining({ kind: 'target', time: 10, value: midiToFrequency(36) }),
+      expect.objectContaining({
+        kind: 'target',
+        time: 10,
+        value: midiToFrequency(BASE_OCTAVE_MIDI),
+      }),
     ]);
   });
 });

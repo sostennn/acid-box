@@ -36,7 +36,13 @@ export {
   STEP_COUNT,
   TUNING_RANGE_SEMITONES,
 } from './model/constants';
-export { DEFAULT_BASS, DEFAULT_DRUMS, DEFAULT_MIX, DEFAULT_TRANSPORT } from './model/defaults';
+export {
+  DEFAULT_BASS,
+  DEFAULT_DRUMS,
+  DEFAULT_MIX,
+  DEFAULT_STEP,
+  DEFAULT_TRANSPORT,
+} from './model/defaults';
 export { DRUM_VOICES } from './model/types';
 export { cutoffToHz, decayToSeconds, resonanceToQ, tuningToCents } from './model/mapping';
 export { holdContext } from './model/pattern';

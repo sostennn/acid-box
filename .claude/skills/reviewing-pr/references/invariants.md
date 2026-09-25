@@ -533,11 +533,11 @@ jouable, CI verte », H2, README « Feuille de route ».
 
 ### G2 — CI et Pages
 
-- Règle : `ci.yml` exécute `pnpm verify` puis `pnpm build` sur PR ; `deploy.yml` déploie
-  `main` sur Pages avec `BASE_PATH`. Le `base` Vite vient de l'environnement. Les assets
-  et workers sont résolus par `new URL(…, import.meta.url)`.
-- Vérifier : une PR qui touche la CI garde ces deux étapes ; un nouvel asset ne suppose
-  jamais `/` comme racine.
+- Règle : `ci.yml` exécute `pnpm verify`, qui se termine par `pnpm build`, sur PR ;
+  `deploy.yml` déploie `main` sur Pages avec `BASE_PATH`. Le `base` Vite vient de
+  l'environnement. Les assets et workers sont résolus par `new URL(…, import.meta.url)`.
+- Vérifier : une PR qui touche la CI ou le script `verify` y garde le build ; un nouvel
+  asset ne suppose jamais `/` comme racine.
 - Sévérité : Bloquant — Reliability.
 
 ### G3 — Une PR = un lot jouable, avec sa description

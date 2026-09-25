@@ -582,7 +582,6 @@ fichier.
 **Dette**
 
 - README : la liste « À écouter à chaque lot » ne couvre que les lots 0 et 5, alors que §6.5 promet une checklist par lot ; celles des lots 1 à 4 vivent dans les descriptions de PR.
-- `StepCell.svelte` recopie `DEFAULT_STEP`, que `@engine` n'exporte pas.
 - Tests exigés et absents : import de `@engine` en node pur (§6.2), pont `engine.svelte.ts` avec un moteur factice (§6.3).
 - `bass-voice.test.ts` retrouve le VCA par « un appel avec `value === 1` » au lieu de son branchement après le filtre (`findVca` dans `index.test.ts`) ; littéraux `36`, `1200`, `0.125` recopiés dans les tests.
 - `main` n'est pas protégée et `pnpm verify` ne lance pas `pnpm build`, que seule la CI exécute.

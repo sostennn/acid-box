@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    DEFAULT_STEP,
     PITCH_RANGE_SEMITONES,
     indexToPitch,
     pitchLabel,
@@ -23,7 +24,7 @@
 
   const maxIndex = PITCH_RANGE_SEMITONES - 1;
   /** C2, milieu de la plage : cible du double-tap. */
-  const defaultPitch = pitchToIndex({ note: 0, octave: 0 }) / maxIndex;
+  const defaultPitch = pitchToIndex(DEFAULT_STEP) / maxIndex;
   const label = $derived(pitchLabel(step));
 
   function setPitch(normalized: number) {

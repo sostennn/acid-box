@@ -360,6 +360,7 @@ describe('createEngine', () => {
       engine.dispatch({ type: 'generator/setParams', patch: { seed: 99 } });
       engine.dispatch({ type: 'generator/run' });
       const first = engine.getState().pattern.bass;
+      expect(first).toEqual(generateAcidLine(engine.getState().generator, 99));
       engine.dispatch({ type: 'generator/run' });
       expect(engine.getState().pattern.bass).toEqual(first);
       expect(randomSeed).not.toHaveBeenCalled();

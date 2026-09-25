@@ -44,7 +44,21 @@ export default ts.config(
         },
       ],
       'no-restricted-globals': ['error', ...forbiddenTimers],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message:
+            'Le hasard du moteur passe par generator/rng.ts, pour qu’une seed rejoue la même ligne.',
+        },
+      ],
     },
+  },
+  {
+    // Le bruit blanc des drums n'a pas à être rejouable.
+    files: ['src/engine/generator/rng.ts', 'src/engine/synth/drums/noise.ts'],
+    rules: { 'no-restricted-properties': 'off' },
   },
   {
     // Seuls le worker de timer et les tests ont le droit d'utiliser les timers du navigateur.

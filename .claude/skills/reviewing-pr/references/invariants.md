@@ -98,7 +98,7 @@ dans le passé », « Édition d'un pas déjà programmé », H10, H12.
 ### B1 — Aucun événement audio déclenché par un timer du navigateur
 
 - Outillage : ESLint interdit `setTimeout`/`setInterval` dans `src/engine` hors
-  `timer.worker.ts` et tests.
+  `timer.worker.ts`, `persistence/storage.ts` (sauvegarde différée, aucun son) et tests.
 - **Non couvert** : `window.setTimeout`, `globalThis.setTimeout`, `self.setTimeout` (la
   règle `no-restricted-globals` ne voit que les identifiants nus), `requestAnimationFrame`,
   `queueMicrotask`, `await` sur une promesse temporisée, `performance.now()` ou
@@ -562,8 +562,8 @@ jouable, CI verte », H2, README « Feuille de route ».
 
 ### G5 — Persistance (lot 7)
 
-- Règle : `PersistedStateV1` avec champ `version` ; payload corrompu → défauts sans
-  exception ; adaptateur de stockage injectable, mémoire en test ; sauvegarde debouncée à
+- Règle : `PersistedStateV1` avec champ `version` ; structure invalide → défauts sans
+  exception, valeur hors bornes ramenée dans ses bornes par le reducer ; adaptateur de stockage injectable, mémoire en test ; sauvegarde debouncée à
   chaque commande ; `localStorage` n'apparaît que dans `persistence/storage.ts`.
 - Sévérité : Bloquant — Reliability.
 

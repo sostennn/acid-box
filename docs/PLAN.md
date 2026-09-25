@@ -9,10 +9,10 @@ est le synthé basse et le plaisir de le jouer en direct au knob. La qualité du
 code est un objectif au même titre que le résultat sonore.
 
 Ce document planifie la **v1** en détail et esquisse v2–v4. Les lots 0 à 6 sont
-livrés (état dans la feuille de route du README). Quand le code s'écarte de ce
-plan, c'est le code qui fait foi et ce document est corrigé dans la même PR ;
-les écarts pas encore traités sont listés dans « Dette et points ouverts », à la
-fin.
+livrés, le lot 7 est en cours (état dans la feuille de route du README). Quand
+le code s'écarte de ce plan, c'est le code qui fait foi et ce document est
+corrigé dans la même PR ; les écarts pas encore traités sont listés dans « Dette
+et points ouverts », à la fin.
 
 Décisions déjà prises avec l'utilisateur :
 
@@ -347,7 +347,7 @@ export interface EngineOptions {
   readonly visibility?: VisibilitySource; // Page Visibility, fake en test
   readonly timer?: TimerSource; // worker par défaut, fake en test
   readonly randomSeed?: () => number; // seed d'un run du générateur sans seed fixée, fixe en test
-  // storage?: StorageAdapter — lot 7 : localStorage par défaut, mémoire en test
+  readonly storage?: StorageAdapter; // localStorage par défaut, mémoire en test
 }
 ```
 
@@ -458,6 +458,13 @@ verte, et fait l'objet d'un ou plusieurs commits (sur demande). Difficulté :
 - Mise en page desktop / tablette paysage finale, vérification tactile de la grille.
 - README complet, capture d'écran, lien de la démo.
 - **On entend** : la même chose qu'au lot 6, mais l'état survit au rechargement et l'app tient sur iPad.
+- Livré en quatre PR : persistance ; tests de rendu `OfflineAudioContext` ; mise en page, tactile et checklist iOS / Safari (passe sur appareil réel, faute de simulateur) ; README et vérification de fin de v1. Les points ouverts du moteur (gate et shuffle, `safeTime`, `MIN_GAIN`, accents rapprochés, hats simultanés) restent pour après la v1.
+- Décisions prises à l'implémentation (persistance) :
+  - **Structure invalide → défauts, valeur hors bornes → bornée.** JSON illisible, version inconnue, champ manquant ou mal typé : on repart des valeurs par défaut. Une valeur hors bornes est ramenée dans ses bornes : `restoreState` rejoue l'état sauvegardé sous forme de commandes dans le reducer, qui applique ses propres règles. Un détail abîmé ne fait pas perdre tout le pattern.
+  - **Ni l'état audio, ni le statut de lecture, ni les mutes entendus, ni l'undo du générateur ne sont sauvegardés.** Les mutes entendus sont reconstruits à partir des mutes demandés (à l'arrêt, ils s'appliquent aussitôt).
+  - **La sauvegarde vit dans le moteur** (`EngineOptions.storage`) : `setState` programme une écriture quand une partie sauvegardée change (`persistedChanged`), écrite `SAVE_DEBOUNCE_MS` après la dernière modification. La valeur n'est sérialisée qu'au moment d'écrire. Le `setTimeout` du délai est autorisé par ESLint dans `persistence/storage.ts` seulement : il écrit sur le stockage et ne programme aucun son.
+  - **Écriture immédiate quand l'onglet passe en arrière-plan** (via `VisibilitySource`) et au `dispose` : iOS tue souvent un onglet caché sans prévenir.
+  - Un stockage absent, refusé ou plein (navigation privée, quota, iframe) ne lève jamais : la session continue sans sauvegarde.
 
 Ordre alternatif possible : le lot 5 (rythmique) peut passer avant le lot 4
 si l'on veut un groove complet plus tôt ; les deux sont indépendants.
@@ -484,7 +491,7 @@ hors ligne.
 | `mapping.ts`                                                              | bornes (0 → min, 1 → max), monotonie, cutoff exponentiel, résonance linéaire en dB, `accentedQ` à poussée constante et borné                                                                                                                                                                                                                                                                                                      |
 | `acid-generator.ts`                                                       | déterminisme à seed égale ; pas 0 = tonique ; toutes les notes dans la gamme ; densités observées dans une tolérance sur 200 tirages ; densité 0 → aucun drapeau ; densité 1 → tous                                                                                                                                                                                                                                               |
 | `state.ts` (reducers)                                                     | chaque commande produit l'état attendu, immuabilité (le snapshot précédent n'est pas muté), clamping des valeurs hors borne                                                                                                                                                                                                                                                                                                       |
-| `serialize.ts`                                                            | aller-retour JSON, rejet d'un payload corrompu (retour aux défauts), champ `version`                                                                                                                                                                                                                                                                                                                                              |
+| `serialize.ts`                                                            | aller-retour JSON, structure invalide → défauts, valeur hors bornes ramenée dans ses bornes, champ `version`                                                                                                                                                                                                                                                                                                                      |
 
 ### 6.2 Tests contre des fakes (Vitest, node)
 
